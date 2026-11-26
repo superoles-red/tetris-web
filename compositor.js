@@ -28,7 +28,7 @@ const SRC_WIDTH = 256;
 const STAGE_WIDTH = 33;
 const SOLO_DANCERS = 6;
 const WELL_W = 88;
-const WELL_H = 168;
+const WELL_H = 184;
 const WELL_BORDER = 4;
 const PAUSE_CORNER = 64;
 const BORDER_INK = '#3cabff';
@@ -299,10 +299,11 @@ export class Compositor {
       return;
     }
     if (innerW > 1 && innerH > 1) {
-      // Ровно кадр партии: 80×160 (10×20 клеток) без паддингов и зазоров.
-      this.blit([16, 64, 80, 160], innerX, innerY, innerW, innerH);
+      // 22 ряда кадра игры: 2 ряда спавна (48..64) + 20 рядов поля (64..224).
+      // Так фигуры видны с самого появления и падают как в оригинале.
+      this.blit([16, 48, 80, 176], innerX, innerY, innerW, innerH);
     }
-    if (this.scene === 'pause') this.fit([96, 64, 64, 16], innerX + innerW / 2 - 32 * k, innerY + innerH / 2 - 8 * k, k);
+    if (this.scene === 'pause') this.fit([96, 64, 64, 16], innerX + innerW / 2 - 32 * k, innerY + 70 * k, k);
   }
 
   thumbnail() {

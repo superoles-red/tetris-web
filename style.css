@@ -217,7 +217,7 @@ h1 + .hint { margin-top: -2px; }
 .language-choice button {
   min-width: 54px; min-height: 30px; padding: 3px 8px; background: #000;
   color: var(--ice); border: 2px solid #1d3a52;
-  font: 700 12px/1 var(--game-font); letter-spacing: .04em;
+  font: 700 12px/1 var(--ui-font); letter-spacing: .04em;
 }
 .language-choice button[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 .installed-note { margin: 0; color: var(--stone); font: 400 11.5px/1.4 var(--ui-font); }

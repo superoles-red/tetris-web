@@ -1,122 +1,98 @@
-/* Тач-управление в стиле старого порта: рамки кнопок — игровая рамка,
-   значки — стрелка из CHR картриджа (--icon-arrow) и маска поворота. */
+/* Тач-управление: крупные, понятные кнопки в стиле игровых панелей. */
 
 .pad {
-  --pair-width: 50%;
-  --key-height: 48px;
-  --control-inset: 4px;
-  --turn-inset: 0px;
+  --edge: 10px;
+  --key-height: 58px;
+  --gap: 10px;
+  --mark-size: 26px;
   --pause-size: 46px;
-  --cap-width: 48px;
-  --cap-height: 44px;
-  --mark-size: 22px;
-  --rotation-mark-width: 54px;
-  --cap-fill: rgb(11 28 44 / 60%);
-  --mark-opacity: .85;
-  --frame-opacity: .85;
-  --ink-outline: drop-shadow(-1px 0 0 #000) drop-shadow(1px 0 0 #000)
-                 drop-shadow(0 -1px 0 #000) drop-shadow(0 1px 0 #000);
-  --rotate-mark: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2024%27%20shape-rendering%3D%27geometricPrecision%27%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27square%27%20d%3D%27M9%207a8%208%200%200%201%2014%200%27%2F%3E%3Cpath%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27square%27%20d%3D%27M23%2017a8%208%200%200%201-14%200%27%2F%3E%3Cpath%20fill%3D%27%23fff%27%20d%3D%27M22%202l5%204-6%203z%27%2F%3E%3Cpath%20fill%3D%27%23fff%27%20d%3D%27M10%2022l-5-4%206-3z%27%2F%3E%3C%2Fsvg%3E");
+  --cap-fill: rgb(6 16 26 / 72%);
+  --cap-border: 3px solid var(--sky);
   position: absolute; inset: 0; z-index: 1;
   display: none; padding: 0; touch-action: none;
 }
 #game[data-scene="play"]:not([inert]) .pad { display: block; }
 
 .pad .moves, .pad .turns {
-  position: absolute; bottom: 10px; display: flex; gap: 0; padding: 0;
-  align-items: center; height: var(--key-height);
+  position: absolute; bottom: var(--edge); display: flex;
+  gap: var(--gap); height: var(--key-height); padding: 0;
 }
-.pad .moves { left: 0; width: var(--pair-width); }
-.pad .turns { right: var(--turn-inset); width: var(--pair-width); }
+.pad .moves { left: var(--edge); width: calc(50% - var(--edge) - var(--gap) / 2); }
+.pad .turns { right: var(--edge); width: calc(50% - var(--edge) - var(--gap) / 2); }
 
 .pad .key {
-  width: 50%; height: 100%; min-width: 0; padding: 0; border: 0;
-  background: transparent; display: grid; place-items: center;
-  outline-offset: -3px; color: #fff; touch-action: none; position: relative;
+  position: relative; flex: 1 1 0; min-width: 0; height: 100%; padding: 0;
+  border: 0; background: transparent; display: grid; place-items: center;
+  color: #fff; touch-action: none; outline-offset: 2px;
 }
 
-/* Значки нарисованы игровой стрелкой/маской. */
+/* Нажимаемая «плитка» — рамка в стиле игровых панелей. */
+.pad .moves .key::after, .pad .turns .key::after, .pad > .down::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border: var(--cap-border); background: var(--cap-fill);
+  box-shadow: inset 0 0 0 1px #0000b4, 0 2px 0 rgb(0 0 0 / 70%);
+}
+.pad .key:active::after, .pad .key.held::after {
+  border-color: var(--gold);
+  background: rgb(247 180 0 / 14%);
+  box-shadow: inset 0 0 0 1px #b15400, 0 1px 0 rgb(0 0 0 / 70%);
+}
+
 .mark { position: relative; z-index: 2; display: block; pointer-events: none; }
 .mark.arrow {
   width: var(--mark-size); height: var(--mark-size);
-  background: #fff; opacity: var(--mark-opacity);
+  background: #fff; opacity: .92;
   -webkit-mask: var(--icon-arrow) center / 100% no-repeat;
   mask: var(--icon-arrow) center / 100% no-repeat;
   image-rendering: pixelated;
-  filter: var(--ink-outline);
+  filter: drop-shadow(1px 1px 0 rgb(0 0 0 / 80%));
 }
 .pad .left .mark.arrow { transform: scaleX(-1); }
 .pad .right .mark.arrow { transform: none; }
 .pad > .down .mark.arrow { transform: rotate(90deg); }
-.mark.rotate { display: none; }
-.pad .turns::before {
-  /* Одна общая «арка» поворота на две зоны нажатия. */
-  content: ''; position: absolute; left: 50%; top: 50%;
-  width: var(--rotation-mark-width); height: 34px; transform: translate(-50%, -50%);
-  z-index: 2; background: #fff; pointer-events: none; opacity: var(--mark-opacity);
-  -webkit-mask: var(--rotate-mark) center / contain no-repeat;
-  mask: var(--rotate-mark) center / contain no-repeat;
+.mark.rotate {
+  width: var(--mark-size); height: var(--mark-size);
+  background: #fff; opacity: .92;
+  -webkit-mask: var(--rotate-icon) center / contain no-repeat;
+  mask: var(--rotate-icon) center / contain no-repeat;
+  filter: drop-shadow(1px 1px 0 rgb(0 0 0 / 80%));
+  --rotate-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27square%27%3E%3Cpath%20d%3D%27M12%204a8%208%200%201%201-8%208%27%2F%3E%3Cpath%20fill%3D%27%23fff%27%20stroke%3D%27none%27%20d%3D%27M12%201l5%204-5%204z%27%2F%3E%3C%2Fsvg%3E");
 }
+.pad .turn.ccw .mark.rotate { transform: scaleX(-1); }
 
-/* Кнопка «вниз» — отдельная вертикальная зона справа. */
-.pad > .down {
-  position: absolute; right: max(5px, calc(12.5% - 32px)); top: 61%;
-  transform: translateY(-50%); width: 64px; height: 58px;
-}
-
-/* Пауза */
+/* Кнопка паузы */
 .pad .utility {
-  position: absolute; top: 4px; right: var(--control-inset);
+  position: absolute; top: var(--edge); right: var(--edge);
   width: var(--pause-size); height: var(--pause-size); padding: 0;
-  border: 3px solid var(--sky); background: rgb(0 0 0 / 80%);
-  box-shadow: inset 0 0 0 2px #134263, 1px 1px #000;
+  border: var(--cap-border); background: var(--cap-fill);
+  box-shadow: inset 0 0 0 1px #0000b4, 0 2px 0 rgb(0 0 0 / 70%);
   display: grid; place-items: center;
 }
 .pad .utility::before {
-  content: ''; display: block; width: 13px; height: 17px;
+  content: ''; display: block; width: 12px; height: 16px;
   border-left: 5px solid var(--ice); border-right: 5px solid var(--ice);
 }
+.pad .utility:active { border-color: var(--gold); background: rgb(247 180 0 / 14%); }
 
-/* Рамки кнопок — игровая рамка-9-slice. */
-.pad .moves .key::after, .pad .turns::after, .pad > .down::after {
-  content: ''; position: absolute; left: 50%; top: 50%;
-  box-sizing: border-box; width: var(--cap-width); height: var(--cap-height);
-  transform: translate(-50%, -50%);
-  border: 3px solid var(--sky);
-  box-shadow: inset 0 0 0 1px #0000b4, 0 0 0 1px #000;
-  pointer-events: none; opacity: var(--frame-opacity); background: var(--cap-fill);
+/* Большая зона сброса справа по центру. */
+.pad > .down {
+  position: absolute; right: var(--edge); top: 45%; transform: translateY(-50%);
+  width: 68px; height: 132px;
 }
 
-.pad .key:is(.held, :active), .pad .turns:has(.turn:is(.held, :active)) {
-  --mark-opacity: 1;
-  --frame-opacity: 1;
-  --cap-fill: rgb(22 59 88 / 82%);
-}
 .pad .key:focus-visible { outline: 2px solid var(--sky); }
 
 @media (orientation: portrait) {
-  #game {
-    --portrait-drop-width: 76px;
-    --portrait-drop-top: 45%;
-    --portrait-controls-height: 54px;
-  }
-  .pad .moves, .pad .turns { bottom: 3px; }
-  .pad > .down {
-    top: var(--portrait-drop-top); right: 0; transform: none;
-    width: var(--portrait-drop-width);
-    height: clamp(88px, 26%, 200px);
-  }
+  .pad > .down { top: 47%; }
 }
 
 @media (orientation: landscape) {
-  .pad { --pair-width: min(28%, 202px); --turn-inset: 6px; }
-  .pad .moves { left: 6px; }
+  .pad { --edge: 8px; --key-height: 54px; }
+  .pad .moves { width: min(28%, 210px); }
+  .pad .turns { width: min(28%, 210px); }
   .pad > .down {
-    --drop-target-height: clamp(76px, 28%, 116px);
-    right: 0;
-    top: min(63%, calc(100% - 66px - var(--drop-target-height) / 2));
-    width: clamp(104px, 18%, 144px);
-    height: var(--drop-target-height);
+    top: min(63%, calc(100% - 66px - 70px));
+    width: clamp(104px, 16%, 148px);
+    height: clamp(84px, 30%, 132px);
   }
-  .pad > .down::after { --cap-width: 72px; }
 }

@@ -128,6 +128,7 @@ export const translations = {
     effects: 'SOUND VOLUME',
     music: 'MUSIC VOLUME',
     track: 'TRACK',
+    trackNames: 'LOGINSKA|BRADINSKY|KARINKA|TROIKA',
     off: 'OFF',
     shuffle: 'SHUFFLE',
     language: 'LANGUAGE',
@@ -180,14 +181,14 @@ export const translations = {
     unitMB: 'MB',
 
     // Legal
-    legalLink: 'О ПРОЕКТЕ',
-    legalTitle: 'О проекте',
-    legalNoGame: 'Игру мы не поставляем: свой ROM приносит игрок. У нас только оболочка и перекомпилятор.',
-    legalLocal: 'Файл не покидает устройство: перекомпиляция идёт локально в браузере.',
-    legalTrademarks: 'Проект не связан с правообладателями. Tetris, Tengen, Nintendo, Elorg и связанные знаки принадлежат их владельцам.',
-    legalLicense: 'Оболочка и перекомпилятор — MIT: github.com/superoles-red/tetris-web.',
-    legalRights: 'Правообладателям: напишите issue в репозитории — страницу отключим.',
-    legalNoFiles: 'В репозитории нет игровых файлов. Титульный экран рисуется из вашего ROM в браузере.',
+    legalLink: 'ABOUT',
+    legalTitle: 'ABOUT',
+    legalNoGame: 'Tetris in the browser, no emulator: your ROM is recompiled to WebAssembly right on the device.',
+    legalLocal: 'The file stays on your device: records and saves live in the browser.',
+    legalTrademarks: 'Tetris, Tengen, Nintendo and Elorg are their owners’ marks. This project is non-commercial and not affiliated.',
+    legalLicense: 'Shell and recompiler code is MIT: github.com/superoles-red/tetris-web. Thanks to the NES emulation community for reference tests.',
+    legalRights: 'Rights holders: open an issue in the repository — we will take the page down.',
+    legalNoFiles: 'No game files in the repository: the title screen is rendered from your ROM in the browser.',
 
     // Accessibility
     ariaMachine: 'Tengen Tetris',
@@ -208,12 +209,12 @@ export const translations = {
 
     // Card / BYOP
     gameTitle: 'ТЕТРИС',
-    gameSubtitle: 'TENGEN · NES',
+    gameSubtitle: 'ТЕНГЕН · ДЕНДИ',
     badgeNeedRom: 'НУЖЕН ФАЙЛ ИГРЫ',
     badgeRomAdded: 'ROM ДОБАВЛЕН',
     badgeFull: 'ДАМП ИЗ КАТАЛОГА',
     badgeCompat: 'СОВМЕСТИМЫЙ РЕЖИМ',
-    stepAddTitle: 'ДОБАВИТЬ ROM',
+    stepAddTitle: 'ДОБАВИТЬ ФАЙЛ',
     stepAddDesc: 'файл .nes · около 48 КБ',
     stepAddDone: 'выполнено',
     stepAddChange: 'заменить файл',
@@ -253,7 +254,7 @@ export const translations = {
     coverNoteInstall: 'Шаг 2 установит игру на главный экран. Можно и просто играть в браузере.',
     cardPlayBrowser: 'ИГРАТЬ',
     cardPlay: 'ИГРАТЬ',
-    cardChangeRom: 'ДРУГОЙ ROM',
+    cardChangeRom: 'ДРУГОЙ ФАЙЛ',
     fileHelpLink: 'Какой файл нужен?',
     fileHelpTitle: 'Какой файл нужен',
     fileHelpSubtitle: 'Один файл. Один раз.',
@@ -267,7 +268,7 @@ export const translations = {
     fileHelpAcceptValue: 'любой рабочий дамп',
     fileHelpNote: 'Из «Файлов», iCloud или с компьютера.\nФайл останется на устройстве.',
     fileHelpPrivacy: 'Файл игры у нас не поставляется\nи никуда не отправляется.',
-    dropHint: 'Отпустите файл, чтобы добавить ROM',
+    dropHint: 'Отпустите файл, чтобы добавить игру',
     chooseFile: 'ВЫБРАТЬ ФАЙЛ',
     back: 'НАЗАД',
     romReading: 'Читаем файл…',
@@ -294,7 +295,7 @@ export const translations = {
     errRomStored: 'Сохранённый ROM не читается. Добавьте файл заново.',
     errUnknown: 'Не удалось добавить файл.',
     errGame: 'Игра остановилась. Обновите страницу и попробуйте ещё раз.',
-    retryOtherRom: 'ДРУГОЙ ROM',
+    retryOtherRom: 'ДРУГОЙ ФАЙЛ',
     retryAgain: 'ПОПРОБОВАТЬ СНОВА',
 
     // Install / PWA
@@ -304,7 +305,7 @@ export const translations = {
     installHelpChrome: 'В меню браузера выберите «Установить приложение» или «Добавить на главный экран» → «Установить».',
     installHelpSamsung: 'Samsung Internet: меню → Add page to → Home screen.',
     installHelpSafari: 'Safari: «Файл» → «Добавить в Dock».',
-    installHelpDesktop: 'Выберите установку в адресной строке или меню браузера. Можно также играть здесь.',
+    installHelpDesktop: 'Меню браузера → «Установить».',
     installContinue: 'ИГРАТЬ',
     installSaving: 'Сохраняем для офлайна…',
     installReady: 'Работает офлайн',
@@ -323,12 +324,13 @@ export const translations = {
     homeContinue: 'ПРОДОЛЖИТЬ',
     records: 'РЕКОРДЫ',
     settingsTitle: 'НАСТРОЙКИ',
-    changeRom: 'ДРУГОЙ ROM',
+    changeRom: 'ДРУГОЙ ФАЙЛ',
 
     // Settings
     effects: 'ГРОМКОСТЬ ЗВУКА',
     music: 'ГРОМКОСТЬ МУЗЫКИ',
     track: 'МЕЛОДИЯ',
+    trackNames: 'ЛОГИНСКА|БРАДИНСКИЙ|КАЛИНКА|ТРОЙКА',
     off: 'ВЫКЛ',
     shuffle: 'СЛУЧАЙНО',
     language: 'ЯЗЫК',
@@ -354,7 +356,7 @@ export const translations = {
     mainMenu: 'ГЛАВНОЕ МЕНЮ',
 
     // Confirmations
-    changeRomPrompt: 'СМЕНИТЬ ROM?',
+    changeRomPrompt: 'СМЕНИТЬ ФАЙЛ?',
     changeRomNote: 'Сохранения, рекорды и обложка текущего ROM будут удалены.',
     replacePrompt: 'НАЧАТЬ НОВУЮ ИГРУ?',
     replaceNote: 'Когда вы начнёте новую игру, она заменит эту сохранённую партию.',
@@ -383,12 +385,12 @@ export const translations = {
     // Legal
     legalLink: 'О ПРОЕКТЕ',
     legalTitle: 'О ПРОЕКТЕ',
-    legalNoGame: 'Мы не поставляем оригинальную игру. Игра — это данные: ROM приносит сам игрок. У нас только оболочка и наш статический перекомпилятор.',
-    legalLocal: 'Ваш файл не загружается на сервер и не покидает устройство: конвертация в WebAssembly происходит локально, в вашем браузере.',
-    legalTrademarks: 'Проект не связан с правообладателями. Tetris, Tengen, Nintendo, Elorg и связанные знаки принадлежат их владельцам.',
-    legalLicense: 'Код оболочки и перекомпилятора — MIT. Исходники: github.com/superoles-red/tetris-web. Сторонние компоненты и их лицензии — в THIRD_PARTY_NOTICES.md.',
-    legalRights: 'Если вы правообладатель и считаете проект нарушающим ваши права — напишите нам через issue в репозитории, мы отреагируем быстро и отключим страницу (kill switch).',
-    legalNoFiles: 'Игровых файлов в репозитории нет. Обложка на экране игры отрисовывается из вашего ROM в вашем браузере и хранится только в локальном хранилище устройства.',
+    legalNoGame: 'Тетрис для браузера без эмулятора: ваш ROM перекомпилируется в WebAssembly прямо на устройстве.',
+    legalLocal: 'Файл не покидает устройство: рекорды и сохранения живут в памяти браузера.',
+    legalTrademarks: 'Tetris, Tengen, Nintendo и Elorg — знаки их владельцев. Проект некоммерческий и не связан с ними.',
+    legalLicense: 'Код оболочки и перекомпилятора — MIT: github.com/superoles-red/tetris-web. Спасибо сообществу NES-эмуляции за эталонные тесты.',
+    legalRights: 'Правообладателям: напишите issue в репозитории — страницу отключим.',
+    legalNoFiles: 'Игровых файлов в репозитории нет: титульный экран рисуется из вашего ROM в браузере.',
 
     // Accessibility
     ariaMachine: 'Тетрис (Tengen)',
