@@ -68,19 +68,22 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'skip-waiting') self.skipWaiting();
 });
 
+// Сеть в приоритете: после деплоя игрок сразу видит согласованные
+// HTML/CSS/JS одной версии, а не смесь нового документа со старым кэшем.
 async function networkFirst(request) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      // Свежий документ кладём как новую оболочку для офлайн-запуска.
-      cache.put(shellUrl('index.html'), response.clone()).catch(() => {});
-    }
+    const response = await fetch(request, { cache: 'no-cache' });
+    if (response.ok) cache.put(request, response.clone()).catch(() => {});
     return response;
   } catch {
-    const cached = await cache.match(shellUrl('index.html')) || await cache.match(shellUrl('./'));
+    const cached = await cache.match(request);
     if (cached) return cached;
-    throw new Error('offline and no shell cached');
+    if (request.mode === 'navigate') {
+      const document = await cache.match(shellUrl('index.html')) || await cache.match(shellUrl('./'));
+      if (document) return document;
+    }
+    throw new Error('offline and no cached response');
   }
 }
 
@@ -113,5 +116,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (!SHELL_EXTENSIONS.test(url.pathname) && url.pathname !== new URL(scope).pathname) return;
-  event.respondWith(staleWhileRevalidate(request));
+  // Код оболочки всегда тянем из сети (офлайн — из кэша): иначе первый
+  // запуск после обновления смешивает новый HTML со старыми стилями.
+  event.respondWith(networkFirst(request));
 });
