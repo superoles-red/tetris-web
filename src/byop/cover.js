@@ -80,6 +80,62 @@ function createCanvas(width, height) {
   return null;
 }
 
+/** Переходный кадр с серым фоном (copyright → титульный экран). */
+export function frameLooksTransitional(buffer) {
+  if (!buffer || buffer.length < WIDTH * HEIGHT) return true;
+  let gray = 0;
+  const total = WIDTH * HEIGHT;
+  for (let i = 0; i < total; i++) {
+    if ((buffer[i] & 0xffffff) === 0x525252) gray++;
+  }
+  return gray > total * 0.45;
+}
+
+/** Кадр годится для обложки: содержательный и не серый переходный. */
+export function isUsableCoverFrame(buffer) {
+  return isCoverFrame(buffer) && !frameLooksTransitional(buffer);
+}
+
+/**
+ * Проверка уже сохранённой обложки (data URL) без доверия к кэшу:
+ * серый переходный кадр отбрасываем, чтобы старые записи в IndexedDB
+ * не показывались как «обложка». Требует DOM (вызывается в браузере).
+ */
+export async function coverDataUrlIsUsable(dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return false;
+  if (typeof document === 'undefined') return true;
+  try {
+    const image = new Image();
+    image.src = dataUrl;
+    await image.decode();
+    if (!image.naturalWidth || !image.naturalHeight) return false;
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return false;
+    context.drawImage(image, 0, 0);
+    const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    const colors = new Set();
+    let gray = 0;
+    let ink = 0;
+    let total = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      total++;
+      const red = data[i], green = data[i + 1], blue = data[i + 2];
+      const color = (red << 16) | (green << 8) | blue;
+      if (color === 0x525252) gray++;
+      if (color) ink++;
+      if (colors.size < 256) colors.add(color);
+    }
+    // У NES-палитры мало цветов (титульный экран Tengen — ~13 разных RGB),
+    // поэтому порог по цветам низкий; серый copyright ловим по его доле.
+    return colors.size >= 8 && gray <= total * 0.45 && ink >= total * 0.02;
+  } catch {
+    return false;
+  }
+}
+
 export const COVER_WIDTH = WIDTH;
 export const COVER_HEIGHT = HEIGHT;
 export const COVER_BLACK = BLACK;

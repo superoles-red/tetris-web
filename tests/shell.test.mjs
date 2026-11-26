@@ -270,6 +270,43 @@ test('есть правовой экран с дисклеймером на RU/E
   // Дисклеймер не прячет игровые файлы: в репозитории их по-прежнему нет (проверено выше).
 });
 
+test('обложка не снимается с серого переходного кадра', async () => {
+  const { isCoverFrame, isUsableCoverFrame, frameLooksTransitional } = await import('../src/byop/cover.js');
+  const width = 256, height = 240;
+  const make = (fill) => new Uint32Array(width * height).fill(fill);
+  // Серый copyright-переход: 96% закраски серым 0x525252 и немного цвета.
+  const transitional = make(0x00525252);
+  // Как на реальном переходном кадре: немного разных цветов поверх серого.
+  for (let color = 0; color < 14; color++) {
+    for (let i = 0; i < 120; i++) {
+      transitional[(i * 37 + color * 1013) % transitional.length] = 0x00000000 | (color * 0x00110507);
+    }
+  }
+  assert.equal(frameLooksTransitional(transitional), true, 'серый переход должен распознаваться');
+  assert.equal(isCoverFrame(transitional), true, 'по доле закраски переход проходит — поэтому нужен второй фильтр');
+  assert.equal(isUsableCoverFrame(transitional), false, 'переходный кадр не должен становиться обложкой');
+
+  // Чёрный кадр: обложкой быть не может.
+  const blank = make(0x00000000);
+  assert.equal(isCoverFrame(blank), false);
+  assert.equal(isUsableCoverFrame(blank), false);
+
+  // Нормальный титульный кадр: чёрный фон + цветной рисунок.
+  const title = make(0x00000000);
+  for (let y = 32; y < 200; y++) {
+    for (let x = 40; x < 216; x++) {
+      const color = ((x * 7 + y * 13) % 15) + 1;
+      title[y * width + x] = (color & 1 ? 0x000000ff : 0) |
+        (color & 2 ? 0x0000ff00 : 0) |
+        (color & 4 ? 0x00ff0000 : 0) |
+        (color & 8 ? 0x00ffffff : 0);
+    }
+  }
+  assert.equal(frameLooksTransitional(title), false);
+  assert.equal(isCoverFrame(title), true);
+  assert.equal(isUsableCoverFrame(title), true);
+});
+
 test('tools/make-icons.mjs существует и не требует внешних зависимостей', async () => {
   const source = await read('tools/make-icons.mjs');
   assert.match(source, /node:zlib/);

@@ -10,7 +10,9 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outIndex = process.argv.indexOf('--output');
 const out = resolve(outIndex > 0 ? process.argv[outIndex + 1] : join(root, '_site'));
 
-const PUBLIC = ['index.html', 'manifest.webmanifest', 'sw.js', 'src', 'assets', 'data'];
+// Публичная часть: оболочка (корневые html/css/js/иконки), src/, assets/, data/,
+// лицензии. Dev-инструменты, тесты, node_modules и настройки в артефакт не идут.
+const PUBLIC = ['index.html', 'manifest.webmanifest', 'sw.js', 'src', 'assets', 'data', 'LICENSE', 'THIRD_PARTY_NOTICES.md'];
 const SKIP = new Set(['node_modules', '.git', 'tools', 'tests', 'docs', '_site']);
 
 async function copyRecursive(from, to) {
@@ -32,6 +34,28 @@ for (const entry of PUBLIC) {
     if (error.code !== 'ENOENT') throw error;
   }
 }
+// Корневые файлы оболочки (app.js, compositor.js, стили и т.д.): копируем всё,
+// что лежит в корне и имеет расширение публичной статики.
+const ROOT_STATIC = /\.(html|css|js|webmanifest|png|svg|ico|txt)$/i;
+for (const name of await readdir(root)) {
+  if (SKIP.has(name) || name.startsWith('.') || name !== 'index.html' && !ROOT_STATIC.test(name)) continue;
+  if (PUBLIC.includes(name)) continue;
+  await cp(join(root, name), join(out, name));
+}
+// Проверка целостности: локальные ссылки из index.html должны существовать.
+{
+  const html = await readFile(join(out, 'index.html'), 'utf8');
+  const missing = [];
+  for (const match of html.matchAll(/(?:href|src)="\.\/([^"]+)"/g)) {
+    const target = match[1].split('?')[0];
+    try { await stat(join(out, target)); } catch { missing.push(target); }
+  }
+  if (missing.length) {
+    console.error('Отказ: в артефакте нет файлов, на которые ссылается index.html:', [...new Set(missing)].join(', '));
+    process.exit(1);
+  }
+}
+
 // Запрет на игровые данные в артефакте: никаких .nes/.zip.
 const offenders = [];
 async function scan(dir) {

@@ -22,7 +22,7 @@ import {
   isMenuScene, isRunScene, SETUP_LEVELS, SETUP_HANDICAPS
 } from './src/byop/full-mode.js';
 import { saveMenuCheckpoint, restoreMenuCheckpoint } from './src/byop/menu-checkpoint.js';
-import { frameToDataUrl, isCoverFrame } from './src/byop/cover.js';
+import { frameToDataUrl, isUsableCoverFrame, coverDataUrlIsUsable } from './src/byop/cover.js';
 
 bindPhoneInsets();
 
@@ -112,6 +112,9 @@ let saveRevision = 0;
 let pageLeaving = false;
 let menuMusicUnlocked = false;
 let rawFrames = 0;
+let coverScene = null;
+let coverSceneFrames = 0;
+let coverStreak = 0;
 const owner = runId();
 const heldInputs = new Map();
 const refreshChoices = [];
@@ -584,6 +587,7 @@ function disposeEngine() {
   runStart = null;
   activeRun = null;
   observedEnd = false;
+  resetCoverCaptureState();
 }
 
 function engineFailed(error) {
@@ -676,8 +680,13 @@ async function prepareFullMode() {
     applyRomLanguage();
     seedRanking(engine.nes, records);
     engine.setPaused(true);
+    // Если обложки ещё нет (старый чекпоинт/чистый кэш), даём картриджу
+    // несколько обычных кадров меню: переходный серый кадр не попадёт в кэш.
     if (!coverDataUrl) {
-      engine.renderPausedFrame?.((buffer, nes) => { void maybeCaptureCover(buffer, nes); });
+      for (let i = 0; i < 45 && !coverDataUrl; i++) {
+        engine.nes.frame();
+        await new Promise(requestAnimationFrame);
+      }
     }
     menuBase = engine.captureStart();
     menuCheckpointSaved = true;
@@ -705,19 +714,54 @@ function prepareCompatibleMode() {
 }
 
 // --- обложка из ROM --------------------------------------------------------
+function resetCoverCaptureState() {
+  coverScene = null;
+  coverSceneFrames = 0;
+  coverStreak = 0;
+}
+
+async function readUsableCover(sha) {
+  if (!store || !sha) return null;
+  let dataUrl = null;
+  try { dataUrl = await store.getCover(sha); } catch { return null; }
+  if (!dataUrl) return null;
+  // Кэш мог остаться от старой версии с серым переходным кадром.
+  if (!(await coverDataUrlIsUsable(dataUrl))) {
+    store.deleteCover(sha).catch(() => {});
+    return null;
+  }
+  return dataUrl;
+}
+
 async function maybeCaptureCover(buffer, nes) {
   if (!rom || coverDataUrl || coverBusy) return;
   if (mode === MODE_FULL) {
     const scene = readScene(nes);
-    if (!isMenuScene(scene)) return;
+    if (!isMenuScene(scene)) {
+      coverScene = null;
+      coverStreak = 0;
+      return;
+    }
+    if (scene !== coverScene) {
+      coverScene = scene;
+      coverSceneFrames = 0;
+      coverStreak = 0;
+    }
+    // Первые кадры меню — переход с серым фоном copyright-экрана:
+    // ждём, пока картридж дорисует титульный экран, и только потом снимаем.
+    if (++coverSceneFrames < 8) return;
   } else if (rawFrames < 20) return;
-  // Титульный экран рисуется несколько кадров: берём только содержательный.
-  if (!isCoverFrame(buffer)) return;
+  if (!isUsableCoverFrame(buffer)) {
+    coverStreak = 0;
+    return;
+  }
+  if (mode === MODE_FULL && ++coverStreak < 3) return;
   coverBusy = true;
   try {
     const dataUrl = frameToDataUrl(buffer);
     if (!dataUrl) return;
     coverDataUrl = dataUrl;
+    resetCoverCaptureState();
     if (store) store.saveCover(rom.sha, dataUrl).catch(() => {});
     if (view === 'cover') renderCard();
     if (view === 'home') renderHome();
@@ -1112,7 +1156,7 @@ async function importRomFile(file) {
     } else {
       runStore = null;
     }
-    coverDataUrl = store ? await store.getCover(rom.sha).catch(() => null) : null;
+    coverDataUrl = store ? await readUsableCover(rom.sha) : null;
     menuCheckpointSaved = false;
     disposeEngine();
     if (view !== 'cover') menu('cover');
@@ -1619,7 +1663,7 @@ async function boot() {
         if (!bytes?.length) throw new Error('stored ROM is empty');
         rom = { ...active, bytes, profile: active.profile ?? null };
         mode = rom.profile?.mode === MODE_FULL ? MODE_FULL : 'compatible';
-        coverDataUrl = await store.getCover(active.sha).catch(() => null);
+        coverDataUrl = await readUsableCover(active.sha);
         if (mode === MODE_FULL) {
           records = loadRecords(active.sha);
           runStore = await openSavedRun(active.sha);
