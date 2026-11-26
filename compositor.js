@@ -28,7 +28,8 @@ const SRC_WIDTH = 256;
 const STAGE_WIDTH = 33;
 const SOLO_DANCERS = 6;
 const WELL_W = 88;
-const WELL_H = 184;
+const WELL_H = 168;
+const WELL_BORDER = 4;
 const PAUSE_CORNER = 64;
 const BORDER_INK = '#3cabff';
 const round = Math.round;
@@ -75,8 +76,8 @@ export class Compositor {
     this.sourceCtx = this.source.getContext('2d', { alpha: false });
     this.image = this.sourceCtx.createImageData(SRC_WIDTH, 272);
     this.pixels = new Uint32Array(this.image.data.buffer);
-    this.wellImage = null;
-    this.wellImageReady = false;
+    this.frameImage = null;
+    this.frameReady = false;
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.resize();
@@ -230,37 +231,78 @@ export class Compositor {
       round(width) - line, round(height) - line);
   }
 
-  // Рамка колодца из кадра самой игры (генерируется из ROM, см. app.js).
-  setWellFrame(url) {
+  // Игровая рамка (40×40, как frame.png): ею обводим колодец и панели HUD.
+  setFrameImage(url) {
     if (!url) return;
     const image = new Image();
     image.onload = () => {
-      this.wellImage = image;
-      this.wellImageReady = true;
+      this.frameImage = image;
+      this.frameReady = true;
     };
     image.src = url;
   }
 
-  well(left, top, k) {
-    const x = left + 4 * k, y = top + 4 * k;
-    this.wellRect = [round(left), round(top), round(WELL_W * k), round(WELL_H * k)];
-    this.ctx.fillStyle = '#000';
-    this.ctx.fillRect(...this.wellRect);
-    if (this.wellImageReady && this.wellImage) {
-      const previous = this.ctx.imageSmoothingEnabled;
-      this.ctx.imageSmoothingEnabled = false;
-      this.ctx.drawImage(this.wellImage, ...this.wellRect);
-      this.ctx.imageSmoothingEnabled = previous;
-    } else {
-      this.bezel(this.wellRect[0], this.wellRect[1], this.wellRect[2], this.wellRect[3], k);
+  /** 9-slice из игровой рамки: углы 16×16, кромки нативными тайлами. */
+  frameRect(left, top, width, height, border) {
+    const x = round(left), y = round(top), w = round(width), h = round(height);
+    const b = Math.max(2, Math.round(border));
+    if (w < 4 * b || h < 4 * b) return false;
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x + b, y + b, w - 2 * b, h - 2 * b);
+    if (!this.frameReady || !this.frameImage) {
+      ctx.strokeStyle = BORDER_INK;
+      ctx.lineWidth = Math.max(2, b / 3);
+      ctx.strokeRect(x + b / 2, y + b / 2, w - b, h - b);
+      ctx.restore();
+      return true;
     }
+    const img = this.frameImage;
+    const slice = img.width >= 48 ? 16 : 16;
+    const middle = img.width - slice * 2;
+    const tile = b;
+    // углы
+    ctx.drawImage(img, 0, 0, slice, slice, x, y, b, b);
+    ctx.drawImage(img, img.width - slice, 0, slice, slice, x + w - b, y, b, b);
+    ctx.drawImage(img, 0, img.height - slice, slice, slice, x, y + h - b, b, b);
+    ctx.drawImage(img, img.width - slice, img.height - slice, slice, slice, x + w - b, y + h - b, b, b);
+    // кромки: нативный тайл игровой рамки, без растяжения
+    for (let cx = b; cx < w - b - 0.5; cx += tile) {
+      const cw = Math.min(tile, w - b - cx);
+      ctx.drawImage(img, slice, 0, middle, slice, x + cx, y, cw, b);
+      ctx.drawImage(img, slice, img.height - slice, middle, slice, x + cx, y + h - b, cw, b);
+    }
+    for (let cy = b; cy < h - b - 0.5; cy += tile) {
+      const ch = Math.min(tile, h - b - cy);
+      ctx.drawImage(img, 0, slice, slice, middle, x, y + cy, b, ch);
+      ctx.drawImage(img, img.width - slice, slice, slice, middle, x + w - b, y + cy, b, ch);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  well(left, top, k) {
+    const width = round(WELL_W * k), height = round(WELL_H * k);
+    // Нативная рамка 16 px из игры: не сжимаем её, чтобы узор оставался чётким.
+    const border = this.frameReady && this.frameImage && this.frameImage.width >= 48
+      ? 16
+      : Math.max(4, Math.round(WELL_BORDER * k));
+    const x = round(left), y = round(top);
+    this.wellRect = [x, y, width, height];
+    this.frameRect(x, y, width, height, border);
+    const innerX = x + border, innerY = y + border;
+    const innerW = width - border * 2, innerH = height - border * 2;
     if (this.scene === 'dance') {
-      this.dance(x, y, k);
+      this.dance(innerX, innerY, k);
       return;
     }
-    this.blit([0, 240, 80, 16], x, y, 80 * k, 16 * k);
-    this.blit([16, 64, 80, 160], x, y + 16 * k, 80 * k, 160 * k);
-    if (this.scene === 'pause') this.fit([96, 64, 64, 16], x + 40 * k, y + 70 * k, k);
+    if (innerW > 1 && innerH > 1) {
+      // Ровно кадр партии: 80×160 (10×20 клеток) без паддингов и зазоров.
+      this.blit([16, 64, 80, 160], innerX, innerY, innerW, innerH);
+    }
+    if (this.scene === 'pause') this.fit([96, 64, 64, 16], innerX + innerW / 2 - 32 * k, innerY + innerH / 2 - 8 * k, k);
   }
 
   thumbnail() {
@@ -337,13 +379,24 @@ export class Compositor {
     for (let i = 0; i < 15; i++) this.fit([56, 96 + 8 * i, 144, 8], cx, first + 10 * i * k, k);
   }
 
-  hudPanel(x, y, w, h) {
+  // Панели HUD как в самой игре: чёрная заливка и тонкие синие линии.
+  hudPanel(x, y, w, h, border = 4) {
     x = round(x); y = round(y); w = round(w); h = round(h);
     if (w < 3 || h < 3) return;
-    this.ctx.fillStyle = '#27374b';
-    this.ctx.fillRect(x, y, w, h);
-    this.ctx.fillStyle = '#000';
-    this.ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    const ctx = this.ctx;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(x, y, w, h);
+    const outer = Math.max(2, Math.round(border * 0.55));
+    const inner = Math.max(1, Math.round(border * 0.25));
+    ctx.strokeStyle = '#3cabff';
+    ctx.lineWidth = outer;
+    ctx.strokeRect(x + outer / 2, y + outer / 2, w - outer, h - outer);
+    if (w > outer * 2 + inner * 2 + 2 && h > outer * 2 + inner * 2 + 2) {
+      ctx.strokeStyle = '#0000b4';
+      ctx.lineWidth = inner;
+      const inset = outer + inner / 2 + 1;
+      ctx.strokeRect(x + inset, y + inset, w - inset * 2, h - inset * 2);
+    }
   }
 
   portrait(w, h) {
@@ -353,7 +406,7 @@ export class Compositor {
     const headers = this.scene === 'dance' ? [['score', .45], ['high', .55]] :
       [['next', .24], ['score', .34], ['high', .42]];
     const fieldTop = round(pad + 30 * scale + 6);
-    this.hudPanel(2, 2, headerWidth + pad - 3, fieldTop - 4);
+    this.hudPanel(2, 2, headerWidth + pad - 3, fieldTop - 4, Math.max(3, round(3 * scale)));
     let left = pad;
     for (const [key, portion] of headers) {
       const slot = headerWidth * portion;
@@ -371,7 +424,7 @@ export class Compositor {
     const railBottom = Math.min(h * this.dropTop - 2 * pad, railTop + railWidth * 2.7);
     const railHeight = railBottom - railTop;
     const railCenter = w - this.dropWidth / 2;
-    this.hudPanel(railCenter - this.dropWidth / 2 + 2, railTop - 5, this.dropWidth - 4, railHeight + 10);
+    this.hudPanel(railCenter - this.dropWidth / 2 + 2, railTop - 5, this.dropWidth - 4, railHeight + 10, Math.max(3, round(2.2 * scale)));
     const railScale = Math.min(scale, railWidth / 50, railHeight / 105);
     this.metric('lines', railCenter, railTop, railWidth, railScale);
     this.metric('level', railCenter, railTop + 31 * railScale, railWidth, railScale);

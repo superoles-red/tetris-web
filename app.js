@@ -23,7 +23,7 @@ import {
 } from './src/byop/full-mode.js';
 import { saveMenuCheckpoint, restoreMenuCheckpoint } from './src/byop/menu-checkpoint.js';
 import { frameToDataUrl, isUsableCoverFrame, coverDataUrlIsUsable } from './src/byop/cover.js';
-import { applyGameSkin, buildWellFrameUrl } from './src/byop/game-skin.js';
+import { applyGameSkin } from './src/byop/game-skin.js';
 
 bindPhoneInsets();
 
@@ -118,7 +118,6 @@ let skinApplied = false;
 let titleFrame = null;
 let playFrame = null;
 let titleArtUrl = null;
-let wellApplied = false;
 const owner = runId();
 const heldInputs = new Map();
 const refreshChoices = [];
@@ -680,15 +679,8 @@ async function refreshSkin() {
         byId('art-placeholder').hidden = true;
       }
       skinApplied = true;
+      renderer.setFrameImage?.(result.assets.frame);
       applyArtVisibility();
-    }
-    if (playFrame && !wellApplied) {
-      const well = buildWellFrameUrl(chr);
-      if (well) {
-        document.documentElement.style.setProperty('--well-image', `url("${well}")`);
-        renderer.setWellFrame?.(well);
-        wellApplied = true;
-      }
     }
     renderCard();
     renderHome();
