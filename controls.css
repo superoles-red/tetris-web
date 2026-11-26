@@ -1,11 +1,11 @@
 /* Тач-управление: крупные, понятные кнопки в стиле игровых панелей. */
 
 .pad {
-  --edge: 10px;
-  --key-height: 58px;
-  --gap: 10px;
-  --mark-size: 26px;
-  --pause-size: 46px;
+  --edge: clamp(8px, 2.6vw, 14px);
+  --key-height: clamp(48px, 13.2vw, 62px);
+  --gap: clamp(7px, 2vw, 12px);
+  --mark-size: clamp(20px, 6.2vw, 30px);
+  --pause-size: clamp(40px, 11vw, 50px);
   --cap-fill: rgb(6 16 26 / 72%);
   --cap-border: 3px solid var(--sky);
   position: absolute; inset: 0; z-index: 1;
@@ -56,7 +56,7 @@
   -webkit-mask: var(--rotate-icon) center / contain no-repeat;
   mask: var(--rotate-icon) center / contain no-repeat;
   filter: drop-shadow(1px 1px 0 rgb(0 0 0 / 80%));
-  --rotate-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27square%27%3E%3Cpath%20d%3D%27M12%204a8%208%200%201%201-8%208%27%2F%3E%3Cpath%20fill%3D%27%23fff%27%20stroke%3D%27none%27%20d%3D%27M12%201l5%204-5%204z%27%2F%3E%3C%2Fsvg%3E");
+  --rotate-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%20stroke-linecap%3D%27square%27%3E%3Cpath%20d%3D%27M12%2020a8%208%200%201%201%208-8%27%2F%3E%3Cpath%20fill%3D%27%23fff%27%20stroke%3D%27none%27%20d%3D%27M16%2012h8v8z%27%2F%3E%3C%2Fsvg%3E");
 }
 .pad .turn.ccw .mark.rotate { transform: scaleX(-1); }
 
@@ -83,16 +83,31 @@
 .pad .key:focus-visible { outline: 2px solid var(--sky); }
 
 @media (orientation: portrait) {
-  .pad > .down { top: 47%; }
+  #game {
+    --portrait-drop-width: clamp(72px, 20vw, 96px);
+    --portrait-drop-top: 48%;
+    --portrait-drop-height: clamp(92px, 19vh, 148px);
+    --portrait-controls-height: clamp(78px, 21vw, 94px);
+  }
+  .pad > .down {
+    top: var(--portrait-drop-top);
+    width: clamp(54px, 15vw, 76px);
+    height: var(--portrait-drop-height);
+  }
 }
 
 @media (orientation: landscape) {
-  .pad { --edge: 8px; --key-height: 54px; }
+  .pad { --edge: 8px; --key-height: clamp(44px, 13vh, 54px); }
   .pad .moves { width: min(28%, 210px); }
   .pad .turns { width: min(28%, 210px); }
   .pad > .down {
-    top: min(63%, calc(100% - 66px - 70px));
-    width: clamp(104px, 16%, 148px);
-    height: clamp(84px, 30%, 132px);
+    top: auto;
+    bottom: calc(var(--key-height) + var(--edge) + 6px);
+    width: clamp(84px, 13%, 112px);
+    height: clamp(64px, 24vh, 110px);
+  }
+  #game {
+    --portrait-drop-width: clamp(56px, 13vw, 86px);
+    --portrait-controls-height: clamp(60px, 16vh, 80px);
   }
 }

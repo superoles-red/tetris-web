@@ -85,10 +85,14 @@ function builtinGlyph(name) {
   return out;
 }
 
-/** Сдвиг глифа вниз на одну строку: у перевода PSCD буквы на 6 строк ниже, чем в EN. */
-function shiftDown(rows) {
+/**
+ * Кириллица PSCD нарисована в 6 строк вместо 7 (как в EN). Растягиваем
+ * на 7 строк и ставим на базовую линию, чтобы высота совпадала с английской.
+ */
+const RU_ROW_MAP = [1, 2, 3, 4, 4, 5, 6];
+function normalizeRuGlyph(rows) {
   const out = new Uint8Array(8);
-  for (let y = 1; y < 8; y++) out[y] = rows[y - 1] ?? 0;
+  for (let y = 0; y < 7; y++) out[y + 1] = rows[RU_ROW_MAP[y]] ?? 0;
   return out;
 }
 
@@ -286,10 +290,10 @@ export function glyphsFromRom(chr, language = 'en') {
     // Перевод PSCD: 6-строчные буквы поднимаем на базовую линию, чтобы
     // они смотрелись как английский шрифт из той же игры.
     for (const ch of '0123456789') {
-      glyphs.set(ch, shiftDown(glyphFromChr(bank, ch.charCodeAt(0))));
+      glyphs.set(ch, normalizeRuGlyph(glyphFromChr(bank, ch.charCodeAt(0))));
     }
     for (const [ch, index] of Object.entries(RUSSIAN_TILES)) {
-      glyphs.set(ch, shiftDown(glyphFromChr(bank, index)));
+      glyphs.set(ch, normalizeRuGlyph(glyphFromChr(bank, index)));
     }
     const sh = glyphs.get('Ш')?.slice() ?? new Uint8Array(8);
     const tse = glyphs.get('Ц')?.slice() ?? new Uint8Array(8);

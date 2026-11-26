@@ -94,6 +94,7 @@ export class Compositor {
       const style = getComputedStyle(this.game);
       this.dropWidth = parseFloat(style.getPropertyValue('--portrait-drop-width')) || 76;
       this.dropTop = (parseFloat(style.getPropertyValue('--portrait-drop-top')) || 45) / 100;
+      this.dropHeight = parseFloat(style.getPropertyValue('--portrait-drop-height')) || 120;
       this.controlsHeight = parseFloat(style.getPropertyValue('--portrait-controls-height')) || 54;
     }
     this.paint();
@@ -299,11 +300,13 @@ export class Compositor {
       return;
     }
     if (innerW > 1 && innerH > 1) {
-      // 22 ряда кадра игры: 2 ряда спавна (48..64) + 20 рядов поля (64..224).
-      // Так фигуры видны с самого появления и падают как в оригинале.
-      this.blit([16, 48, 80, 176], innerX, innerY, innerW, innerH);
+      // Верхние 2 ряда — зона спавна, которую draw() собрал из игровых
+      // спрайтов (без фонового мусора), остальные 20 рядов — само поле.
+      const spawnH = round(innerH / 11);
+      this.blit([0, 240, 80, 16], innerX, innerY, innerW, spawnH);
+      this.blit([16, 64, 80, 160], innerX, innerY + spawnH, innerW, innerH - spawnH);
     }
-    if (this.scene === 'pause') this.fit([96, 64, 64, 16], innerX + innerW / 2 - 32 * k, innerY + 70 * k, k);
+    if (this.scene === 'pause') this.fit([96, 64, 64, 16], innerX + (innerW - 64 * k) / 2, innerY + 70 * k, k);
   }
 
   thumbnail() {
@@ -422,7 +425,8 @@ export class Compositor {
 
     const railTop = Math.max(fieldTop, PAUSE_CORNER) + pad;
     const railWidth = this.dropWidth - 2 * pad;
-    const railBottom = Math.min(h * this.dropTop - 2 * pad, railTop + railWidth * 2.7);
+    const railBottom = Math.max(railTop + 48, Math.min(
+      h * this.dropTop - this.dropHeight / 2 - pad, railTop + railWidth * 2.7));
     const railHeight = railBottom - railTop;
     const railCenter = w - this.dropWidth / 2;
     this.hudPanel(railCenter - this.dropWidth / 2 + 2, railTop - 5, this.dropWidth - 4, railHeight + 10, Math.max(3, round(2.2 * scale)));
@@ -447,7 +451,7 @@ export class Compositor {
     const y = Math.min(38, Math.max(9, h * .05));
     const rightY = clearRight < 66 ? Math.max(PAUSE_CORNER + 2, y) : y;
     const bottom = Math.min(h - 112, h * .68);
-    const nearDrop = rightX + rightW > w * .875 - 18;
+    const nearDrop = rightX + rightW > w * .87 - 18;
     const rightBottom = nearDrop && this.scene !== 'dance' ? Math.min(bottom, h * .60 - 18) : bottom;
     const leftX = left - gap - side;
     const leftHeight = Math.max(48, bottom - y);
