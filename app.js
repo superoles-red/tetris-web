@@ -768,6 +768,7 @@ function onFrame(buffer, nes, present = true) {
     releaseAll();
     activeScene = scene;
     game.dataset.scene = scene;
+    if (scene === 'play') schedulePadMetrics();
   }
   if (!observedEnd && (scene === 'gameover' || scene === 'scores')) {
     observedEnd = true;
@@ -799,6 +800,41 @@ function onFrame(buffer, nes, present = true) {
   }
 }
 
+/**
+ * Подгоняет зарезервированные области под реальный размер кнопок:
+ * так колодец никогда не заезжает под тач-управление на разных телефонах.
+ */
+function syncPadMetrics() {
+  if (!window.matchMedia('(orientation: portrait)').matches) {
+    game.style.removeProperty('--portrait-controls-height');
+    game.style.removeProperty('--portrait-drop-width');
+    game.style.removeProperty('--portrait-drop-height');
+    game.style.removeProperty('--portrait-drop-top');
+    return;
+  }
+  const moves = document.querySelector('.pad .moves');
+  const down = document.querySelector('.pad > .down');
+  if (!moves || !down) return;
+  const gameBox = game.getBoundingClientRect();
+  const movesBox = moves.getBoundingClientRect();
+  const downBox = down.getBoundingClientRect();
+  if (!gameBox.height || !movesBox.height || !downBox.height) return;
+  const controls = Math.round(gameBox.bottom - movesBox.top + 12);
+  const dropWidth = Math.round(gameBox.right - downBox.left + 8);
+  game.style.setProperty('--portrait-controls-height', controls + 'px');
+  game.style.setProperty('--portrait-drop-width', dropWidth + 'px');
+  game.style.setProperty('--portrait-drop-height', Math.round(downBox.height) + 'px');
+  game.style.setProperty('--portrait-drop-top',
+    (((downBox.top + downBox.height / 2) - gameBox.top) / gameBox.height * 100).toFixed(2) + '%');
+  renderer.resize();
+}
+
+function schedulePadMetrics() {
+  requestAnimationFrame(() => {
+    try { syncPadMetrics(); } catch (error) { console.warn('pad metrics', error); }
+  });
+}
+
 function enterGameScreen() {
   view = 'game';
   game.hidden = false;
@@ -806,6 +842,7 @@ function enterGameScreen() {
   overlay.hidden = true;
   overlay.classList.remove('in-game');
   renderer.resize();
+  schedulePadMetrics();
   if (engine && engineState === 'ready') {
     engine.wakeAudio();
     engine.start();
@@ -1548,6 +1585,8 @@ function showPage() {
   engine?.setAudioPageActive?.(true);
   syncMenuMusic();
 }
+window.addEventListener('resize', schedulePadMetrics);
+window.addEventListener('orientationchange', schedulePadMetrics);
 window.addEventListener('pagehide', hidePage);
 window.addEventListener('pageshow', showPage);
 window.addEventListener('focus', showPage);
