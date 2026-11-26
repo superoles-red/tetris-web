@@ -14,7 +14,7 @@ import {
 } from './rankings.js';
 import { openStore } from './src/byop/store.js';
 import {
-  loadDumpCatalog, inspectRomFile, checkRomFileMeta, passportRows, refusalText,
+  loadDumpCatalog, inspectRomFile, checkRomFileMeta, refusalText,
   formatBytes, modeTextKey, MODE_FULL
 } from './src/byop/passport.js';
 import {
@@ -23,6 +23,7 @@ import {
 } from './src/byop/full-mode.js';
 import { saveMenuCheckpoint, restoreMenuCheckpoint } from './src/byop/menu-checkpoint.js';
 import { frameToDataUrl, isUsableCoverFrame, coverDataUrlIsUsable } from './src/byop/cover.js';
+import { applyGameSkin, buildWellFrameUrl } from './src/byop/game-skin.js';
 
 bindPhoneInsets();
 
@@ -33,12 +34,10 @@ const SAVE_INTERVAL = 6000;
 const SHUFFLE = 'shuffle';
 const TRACKS = [1, 2, 3, 4];
 const VOLUMES = [0, 10, 25, 50, 100];
-const MENU_MUSIC_VIEWS = new Set(['cover', 'file-help', 'install-help', 'done', 'home', 'setup', 'confirm', 'records']);
+const MENU_MUSIC_VIEWS = new Set(['cover', 'install-help', 'home', 'setup', 'confirm', 'records']);
 const VIEW_ELEMENTS = {
   cover: 'cover-screen',
-  'file-help': 'file-help',
   'install-help': 'install-help',
-  done: 'done-screen',
   home: 'home-menu',
   setup: 'setup-menu',
   pause: 'pause-menu',
@@ -50,8 +49,8 @@ const VIEW_ELEMENTS = {
   legal: 'legal-screen'
 };
 const FOCUS_ORDER = {
-  cover: 'step-rom', 'file-help': 'file-help-choose', 'install-help': 'install-help-continue',
-  done: 'done-open', home: 'play', setup: 'start', pause: 'resume', settings: 'settings-back',
+  cover: 'step-rom', 'install-help': 'install-help-continue',
+  home: 'play', setup: 'start', pause: 'resume', settings: 'settings-back',
   records: 'records-back', 'record-edit': 'record-edit-title', 'record-confirm': 'record-confirm-no',
   confirm: 'confirm-no', legal: 'legal-back'
 };
@@ -115,6 +114,11 @@ let rawFrames = 0;
 let coverScene = null;
 let coverSceneFrames = 0;
 let coverStreak = 0;
+let skinApplied = false;
+let titleFrame = null;
+let playFrame = null;
+let titleArtUrl = null;
+let wellApplied = false;
 const owner = runId();
 const heldInputs = new Map();
 const refreshChoices = [];
@@ -181,8 +185,6 @@ function localize() {
   byId('pause-key').setAttribute('aria-label', t.ariaPause);
   byId('home-settings').setAttribute('aria-label', t.ariaSettings);
   byId('home-settings').title = t.ariaSettings;
-  byId('cover-lang-label').textContent = settings.language === 'ru' ? 'EN' : 'РУС';
-  byId('cover-lang').setAttribute('aria-label', settings.language === 'ru' ? t.langEnglish : t.langRussian);
   const shortcuts = { left: '←', right: '→', down: '↓', a: 'X / ↑', b: 'Z' };
   for (const [key, node] of padButtons) {
     node.setAttribute('aria-label', t[BUTTON_LABELS[key]]);
@@ -237,15 +239,17 @@ function storageRefusal(error) {
 function renderInstallHelp() {
   const text = byId('install-help-text');
   const status = byId('install-help-status');
+  const continueButton = byId('install-help-continue');
+  continueButton.textContent = t.installContinue;
+  byId('install-help-title').textContent = t.installTitle;
   if (!installer) {
     text.textContent = t.installUnavailable;
     status.hidden = true;
     return;
   }
-  const hint = PLATFORM_KEYS[installer.platformHint()] ?? 'installHelpDesktop';
-  text.textContent = t.installUnavailable === t[hint] ? t[hint] : t[hint];
+  const hintKey = PLATFORM_KEYS[installer.platformHint()] ?? 'installHelpDesktop';
+  text.textContent = t[hintKey] ?? t.installHelpDesktop;
   if (!installer.eligible) {
-    byId('install-help-continue').textContent = t.cardPlayBrowser;
     status.hidden = true;
     return;
   }
@@ -253,7 +257,6 @@ function renderInstallHelp() {
   status.hidden = false;
   status.className = 'card-status ' + (state === 'ready' ? 'ready' : state === 'failed' ? 'failed' : '');
   status.textContent = state === 'ready' ? t.installReady : state === 'failed' ? t.installFailed : t.installSaving;
-  byId('install-help-continue').textContent = t.installContinueBrowser;
 }
 
 function renderSettingsInstall() {
@@ -287,14 +290,14 @@ async function installFlow() {
   if (!rom || !installer) return;
   if (installer.installed || installer.standalone) {
     setInstallChoice('installed');
-    menu('done');
+    goHome();
     return;
   }
   if (installer.promptAvailable) {
     const outcome = await installer.prompt();
     if (outcome === 'accepted' || outcome === 'installed') {
       setInstallChoice('installed');
-      menu('done');
+      goHome();
       return;
     }
     menu('install-help');
@@ -303,6 +306,12 @@ async function installFlow() {
   }
   menu('install-help');
   renderInstallHelp();
+}
+
+function goHome() {
+  setInstallChoice('browser');
+  unlockMenuMusic();
+  menu('home');
 }
 
 // --- карточка / главное меню ----------------------------------------------
@@ -315,76 +324,11 @@ function renderCard() {
   byId('game-title').textContent = t.gameTitle;
   byId('game-subtitle').textContent = t.gameSubtitle;
 
-  const badge = byId('card-badge');
-  badge.textContent = !hasRom ? t.badgeNeedRom : mode === MODE_FULL ? t.badgeFull : t.badgeCompat;
-  badge.className = 'badge' + (!hasRom ? '' : mode === MODE_FULL ? ' badge-green' : ' badge-blue');
-
-  const image = byId('cover-image');
-  const placeholder = byId('cover-placeholder');
-  if (coverDataUrl) {
-    image.src = coverDataUrl;
-    image.alt = t.coverAlt;
-    image.hidden = false;
-    placeholder.hidden = true;
-  } else {
-    image.removeAttribute('src');
-    image.hidden = true;
-    placeholder.hidden = false;
-  }
-
+  // До ROM показываем только «шаги»: никакого паспорта и лишних надписей.
   const stepRom = byId('step-rom');
   stepRom.classList.toggle('on', !hasRom && !cardBusyText);
   stepRom.classList.toggle('done', hasRom);
   byId('step-rom-title').textContent = t.stepAddTitle;
-  byId('step-rom-desc').textContent = hasRom ? t.stepAddDone : t.stepAddDesc;
-
-  const installed = Boolean(installer?.installed || installer?.standalone);
-  const stepInstall = byId('step-install');
-  stepInstall.disabled = !hasRom || Boolean(cardBusyText);
-  stepInstall.classList.toggle('on', hasRom && !installed);
-  stepInstall.classList.toggle('done', hasRom && installed);
-  byId('step-install-title').textContent = t.stepInstallTitle;
-  byId('step-install-desc').textContent = !hasRom ? t.stepInstallLocked
-    : installed ? t.stepInstallDone
-      : cardBusyText ? t.stepInstallBusy : t.stepInstallDesc;
-
-  const done = byId('rom-done');
-  done.hidden = !hasRom;
-  if (hasRom) {
-    byId('rom-done-title').textContent = t.romDoneTitle;
-    byId('rom-done-desc').textContent = formatText(
-      rom.profile?.catalogMatched ? t.romDoneDesc : t.romDoneCompat,
-      { name: gameDisplayName(), size: formatBytes(rom.size, t) }
-    );
-  }
-
-  const passport = byId('passport');
-  passport.hidden = !hasRom;
-  if (hasRom) {
-    const essential = new Set(['passportFile', 'passportSize', 'passportMapper', 'passportLanguage', 'passportMode', 'passportSha']);
-    const rows = byId('passport-rows');
-    const moreRows = byId('passport-more-rows');
-    rows.replaceChildren();
-    moreRows.replaceChildren();
-    for (const [key, value] of passportRows(rom.profile, t)) {
-      const row = document.createElement('div');
-      row.className = 'kv2';
-      const label = document.createElement('span');
-      label.textContent = t[key] ?? key;
-      const output = document.createElement('b');
-      output.textContent = value;
-      row.append(label, output);
-      (essential.has(key) ? rows : moreRows).append(row);
-    }
-    const more = byId('passport-more');
-    more.hidden = moreRows.childElementCount === 0;
-    more.open = false;
-  }
-  byId('panel').classList.toggle('has-rom', hasRom);
-
-  const modeNote = byId('mode-note');
-  modeNote.hidden = !hasRom;
-  modeNote.textContent = hasRom ? t[modeTextKey(mode)] : '';
 
   const errorBox = byId('rom-error');
   errorBox.hidden = !romError;
@@ -400,26 +344,11 @@ function renderCard() {
   if (cardBusyText) statusText = cardBusyText;
   else if (!hasRom && storeError) { statusText = t.errStorageBlocked; isError = true; }
   else if (storageWarning) { statusText = storageWarning; isError = true; }
-  else if (hasRom && engineState === 'loading') statusText = t.homeStatusLoading;
-  else if (hasRom && engineState === 'error') {
-    statusText = formatText(t.errEngineDetail, { detail: formatErrorDetail(engineError) });
-    isError = true;
-  }
   status.hidden = !statusText;
   status.textContent = statusText;
   status.className = 'card-status' + (isError ? ' error' : '');
 
-  const play = byId('card-play');
-  play.hidden = !hasRom || Boolean(cardBusyText);
-  play.textContent = installResolved() ? t.cardPlay : t.cardPlayBrowser;
-  const change = byId('card-change-rom');
-  change.hidden = !hasRom || Boolean(cardBusyText);
-  change.textContent = t.cardChangeRom;
-  byId('file-help-link').hidden = hasRom;
-
-  byId('cover-note').textContent = !hasRom
-    ? t.coverNoteNoRom
-    : installResolved() ? t.coverNoteRom : t.coverNoteInstall;
+  byId('cover-note').textContent = !hasRom ? t.coverNoteNoRom : t.coverNoteRom;
 }
 
 function renderHome() {
@@ -429,26 +358,10 @@ function renderHome() {
   continueRun.textContent = t.homeContinue;
   const play = byId('play');
   play.textContent = mode === MODE_FULL ? t.homeNewGame : t.homePlayAsIs;
-  play.classList.toggle('primary', !savedInfo);
+  play.classList.toggle('primary', true);
   play.disabled = !hasRom || engineState === 'loading' || engineState === 'error';
   const recordsButton = byId('records');
   recordsButton.hidden = mode !== MODE_FULL;
-  byId('change-rom').textContent = t.changeRom;
-
-  const status = byId('home-status');
-  let statusText = '';
-  let isError = false;
-  if (engineState === 'loading') statusText = t.homeStatusLoading;
-  else if (engineState === 'error') {
-    statusText = formatText(t.errEngineDetail, { detail: formatErrorDetail(engineError) });
-    isError = true;
-  } else if (storageWarning) {
-    statusText = storageWarning;
-    isError = true;
-  }
-  status.hidden = !statusText;
-  status.textContent = statusText;
-  status.className = 'card-status' + (isError ? ' error' : '');
 
   const modeNote = byId('home-mode-note');
   modeNote.hidden = !hasRom || mode === MODE_FULL;
@@ -474,6 +387,11 @@ function renderPause() {
 }
 
 // --- меню ------------------------------------------------------------------
+function applyArtVisibility() {
+  const show = view === 'home' ? Boolean(titleArtUrl) : view === 'cover';
+  byId('art').hidden = !show;
+}
+
 function menu(name, { focus = true } = {}) {
   if (!Object.hasOwn(VIEW_ELEMENTS, name)) throw new Error('Unknown view ' + name);
   view = name;
@@ -485,7 +403,8 @@ function menu(name, { focus = true } = {}) {
   game.inert = true;
   const panel = byId('panel');
   panel.className = (name === 'cover' || name === 'home') ? 'panel cover' : 'panel dialog';
-  byId('art').hidden = !(name === 'cover' || name === 'home');
+  applyArtVisibility();
+  byId('home-settings').hidden = name !== 'home';
   for (const [key, id] of Object.entries(VIEW_ELEMENTS)) byId(id).hidden = key !== name;
   notice.hidden = true;
   if (name === 'cover') renderCard();
@@ -632,8 +551,11 @@ async function loadEngine() {
     else prepareCompatibleMode();
     loaded = true;
     engineState = 'ready';
+    captureTitleFrame();
+    void refreshSkin();
     renderCard();
     renderHome();
+    if (view === 'cover') menu('home');
     syncMenuMusic();
   } catch (error) {
     engineFailed(error);
@@ -711,6 +633,68 @@ async function prepareFullMode() {
 
 function prepareCompatibleMode() {
   engine.setPaused(true);
+}
+
+// --- скин оболочки из оригинальной графики ---------------------------------
+function romChrBytes() {
+  if (!rom?.bytes) return null;
+  const bytes = rom.bytes;
+  const flags = bytes[6] ?? 0;
+  const prg = bytes[4] ?? 0;
+  const chr = bytes[5] ?? 0;
+  const start = 16 + ((flags & 4) ? 512 : 0) + prg * 16384;
+  const length = Math.min(chr * 8192, bytes.length - start);
+  return length > 0 ? bytes.subarray(start, start + length) : null;
+}
+
+function captureTitleFrame() {
+  const buffer = engine?.nes?.ppu?.buffer;
+  if (!buffer) return;
+  titleFrame = new Uint32Array(buffer.length);
+  titleFrame.set(buffer);
+}
+
+function capturePlayFrame() {
+  const buffer = engine?.nes?.ppu?.buffer;
+  if (!buffer) return;
+  playFrame = new Uint32Array(buffer.length);
+  playFrame.set(buffer);
+}
+
+async function refreshSkin() {
+  if (!rom || mode !== MODE_FULL) return;
+  const chr = romChrBytes();
+  if (!chr) return;
+  try {
+    if (!skinApplied) {
+      const result = await applyGameSkin({
+        chr,
+        language: rom.profile?.language === 'ru' ? 'ru' : 'en',
+        titleBuffer: titleFrame
+      });
+      titleArtUrl = result.assets.title;
+      const image = byId('art-image');
+      if (titleArtUrl) {
+        image.src = titleArtUrl;
+        image.hidden = false;
+        byId('art-placeholder').hidden = true;
+      }
+      skinApplied = true;
+      applyArtVisibility();
+    }
+    if (playFrame && !wellApplied) {
+      const well = buildWellFrameUrl(chr);
+      if (well) {
+        document.documentElement.style.setProperty('--well-image', `url("${well}")`);
+        renderer.setWellFrame?.(well);
+        wellApplied = true;
+      }
+    }
+    renderCard();
+    renderHome();
+  } catch (error) {
+    console.warn('game skin failed', error);
+  }
 }
 
 // --- обложка из ROM --------------------------------------------------------
@@ -916,6 +900,8 @@ async function beginFull() {
           if (!rankingSeeded) seedRanking(engine.nes, records);
           applyMix();
           runStart = engine.captureStart();
+          capturePlayFrame();
+          void refreshSkin();
           activeRun = { id: runId(), owner, fresh: true };
           // «Сразу в меню»: сохраняем состояние меню только после первого
           // успешного автозапуска партии.
@@ -1144,6 +1130,12 @@ async function importRomFile(file) {
       profile: result.passport
     };
     mode = result.passport.mode;
+    const romLanguage = result.passport.language === 'ru' ? 'ru' : 'en';
+    if (settings.language !== romLanguage) {
+      settings.language = romLanguage;
+      persistSettings();
+      localize();
+    }
     records = mode === MODE_FULL ? loadRecords(rom.sha) : [];
     savedInfo = null;
     if (mode === MODE_FULL) {
@@ -1310,30 +1302,8 @@ function openLegal() {
 // --- экран настроек --------------------------------------------------------
 function renderChrome() {
   renderSettingsInstall();
-  byId('settings-change-rom').textContent = t.changeRom;
+  byId('settings-change-rom').textContent = t.cardChangeRom;
   byId('settings-change-rom').hidden = !rom;
-  byId('settings-legal').textContent = t.legalLink;
-}
-
-async function renderStorageInfo() {
-  const info = byId('storage-info');
-  if (!store) {
-    info.textContent = t.storageUnavailable;
-    info.hidden = false;
-    return;
-  }
-  const [estimate, persisted] = await Promise.all([
-    store.estimate().catch(() => null),
-    store.persisted().catch(() => false)
-  ]);
-  if (!estimate) {
-    info.hidden = true;
-    return;
-  }
-  const size = formatBytes(estimate.usage, t);
-  info.textContent = t.storageTitle + ': ' + formatText(t.storageUsage, { size }) +
-    ' · ' + (persisted ? t.storagePersist : t.storageNoPersist);
-  info.hidden = false;
 }
 
 function renderSettings() {
@@ -1341,28 +1311,20 @@ function renderSettings() {
   byId('settings-languages').querySelectorAll('button').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.language === settings.language));
   });
-  void renderStorageInfo();
 }
 
 // --- построение выпадающих опций ------------------------------------------
 function addChoice(containerId, key, values, read, change, format = String) {
   const row = document.createElement('div');
-  row.className = 'choice';
-  const center = document.createElement('div');
+  row.className = 'choice-row';
   const heading = document.createElement('small');
+  heading.className = 'choice-label';
   const output = document.createElement('output');
-  center.append(heading, output);
+  output.className = 'choice-value';
   function arrow(direction) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = direction < 0 ? 'previous' : 'next';
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 12 12');
-    svg.setAttribute('aria-hidden', 'true');
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M4.5 1 10 6l-5.5 5V8h-3V4h3z');
-    svg.append(path);
-    button.append(svg);
+    button.className = 'choice-arrow ' + (direction < 0 ? 'prev' : 'next');
     button.onclick = () => {
       change(values[(values.indexOf(read()) + direction + values.length) % values.length]);
       settingsChanged();
@@ -1380,7 +1342,7 @@ function addChoice(containerId, key, values, read, change, format = String) {
   }
   refresh();
   refreshChoices.push(refresh);
-  row.append(previous, center, next);
+  row.append(heading, previous, output, next);
   byId(containerId).append(row);
 }
 
@@ -1407,7 +1369,6 @@ function closeSettings() {
     .focus({ preventScroll: true });
 }
 
-byId('cover-lang').onclick = () => applyLanguage(settings.language === 'ru' ? 'en' : 'ru');
 byId('home-settings').onclick = () => openSettings('home');
 byId('pause-settings').onclick = () => openSettings('pause');
 byId('settings-back').onclick = closeSettings;
@@ -1424,29 +1385,12 @@ byId('step-rom').onclick = () => {
   if (rom) confirmRun('change-rom');
   else openFilePicker();
 };
-byId('step-install').onclick = () => { if (rom && !cardBusyText) void installFlow(); };
-byId('card-play').onclick = () => {
-  if (!rom) return;
-  if (!installResolved()) setInstallChoice('browser');
-  unlockMenuMusic();
-  menu('home');
-};
-byId('card-change-rom').onclick = () => confirmRun('change-rom');
-byId('file-help-link').onclick = () => menu('file-help');
-byId('file-help-choose').onclick = () => openFilePicker();
-byId('file-help-back').onclick = () => menu('cover');
-byId('install-help-continue').onclick = () => {
-  setInstallChoice('browser');
-  unlockMenuMusic();
-  menu('home');
-};
-byId('install-help-back').onclick = () => menu('cover');
-byId('done-open').onclick = () => { unlockMenuMusic(); menu('home'); };
+byId('install-help-continue').onclick = goHome;
+byId('install-help-back').onclick = () => goHome();
 byId('rom-error-retry').onclick = () => openFilePicker();
 byId('cover-legal').onclick = openLegal;
 byId('home-legal').onclick = openLegal;
 byId('pause-legal').onclick = openLegal;
-byId('settings-legal').onclick = openLegal;
 byId('legal-back').onclick = () => menu(legalReturn);
 
 byId('confirm-no').onclick = () => menu('home');
@@ -1468,7 +1412,6 @@ byId('play').onclick = () => {
 };
 byId('continue-run').onclick = () => confirmRun('continue');
 byId('records').onclick = () => { recordsAfterGame = false; menu('records'); };
-byId('change-rom').onclick = () => confirmRun('change-rom');
 byId('setup-back').onclick = home;
 byId('start').onclick = () => { void beginFull(); };
 byId('resume').onclick = resume;
@@ -1491,7 +1434,7 @@ byId('rom-file').addEventListener('change', (event) => {
 // --- drag&drop ROM ---------------------------------------------------------
 let dragDepth = 0;
 function isDropView() {
-  return view === 'cover' || view === 'file-help';
+  return view === 'cover';
 }
 overlay.addEventListener('dragenter', (event) => {
   event.preventDefault();
@@ -1569,7 +1512,7 @@ window.addEventListener('keydown', (event) => {
       byId('record-confirm-no').click();
       return;
     }
-    if (!['settings', 'pause', 'setup', 'confirm', 'records', 'cover', 'file-help', 'install-help', 'done', 'home', 'legal'].includes(view)) return;
+    if (!['settings', 'pause', 'setup', 'confirm', 'records', 'cover', 'install-help', 'home', 'legal'].includes(view)) return;
     event.preventDefault();
     if (event.repeat) return;
     if (view === 'legal') menu(legalReturn);
@@ -1663,6 +1606,11 @@ async function boot() {
         if (!bytes?.length) throw new Error('stored ROM is empty');
         rom = { ...active, bytes, profile: active.profile ?? null };
         mode = rom.profile?.mode === MODE_FULL ? MODE_FULL : 'compatible';
+        const storedLanguage = rom.profile?.language === 'ru' ? 'ru' : 'en';
+        if (settings.language !== storedLanguage) {
+          settings.language = storedLanguage;
+          persistSettings();
+        }
         coverDataUrl = await readUsableCover(active.sha);
         if (mode === MODE_FULL) {
           records = loadRecords(active.sha);

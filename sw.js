@@ -31,6 +31,8 @@ const SHELL = [
   'src/byop/full-mode.js',
   'src/byop/menu-checkpoint.js',
   'src/byop/cover.js',
+  'src/byop/game-font.js',
+  'src/byop/game-skin.js',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
   'assets/icons/maskable.png',
