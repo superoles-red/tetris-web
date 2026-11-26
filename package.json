@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "serve": "node tools/serve.mjs",
-    "test": "node --test tests/",
+    "test": "node --test",
     "compare": "node tools/compare.mjs",
     "site": "node tools/build-site.mjs"
   },

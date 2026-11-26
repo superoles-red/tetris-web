@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,interactive-widget=resizes-content">
+  <meta name="theme-color" content="#070c13">
+  <title>Tetris · Tengen</title>
+  <meta name="description" content="Tetris (Tengen, NES): bring your own ROM. The game code is recompiled to WebAssembly in your browser.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="./assets/icons/apple-touch.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tetris">
+  <link rel="icon" href="./assets/icons/icon-192.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="controls.css">
+  <link rel="stylesheet" href="install.css">
+</head>
+<body>
+  <main id="machine" aria-label="Tengen Tetris">
+    <section id="game" aria-label="Game" hidden data-scene="boot">
+      <div id="screen"><canvas id="picture" aria-label="Tetris playfield and statistics"></canvas></div>
+      <button class="action primary" id="game-over-next" type="button" data-i18n="showResults" hidden></button>
+      <div id="result-bar" hidden>
+        <button id="after-game" class="action primary" type="button" data-i18n="playAgain" hidden></button>
+      </div>
+      <div class="pad" aria-label="Game controls">
+        <div class="moves">
+          <button class="key direction left" type="button" data-button="left" aria-label="">
+            <svg class="mark arrow" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 1 2 6l5.5 5V8h3V4h-3z"/></svg>
+          </button>
+          <button class="key direction down" type="button" data-button="down" aria-label="">
+            <svg class="mark arrow" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 1 2 6l5.5 5V8h3V4h-3z"/></svg>
+          </button>
+          <button class="key direction right" type="button" data-button="right" aria-label="">
+            <svg class="mark arrow" viewBox="0 0 12 12" aria-hidden="true"><path d="M7.5 1 2 6l5.5 5V8h3V4h-3z"/></svg>
+          </button>
+        </div>
+        <button id="pause-key" class="key utility" type="button" aria-label=""></button>
+        <div class="turns">
+          <button class="key turn ccw" type="button" data-button="b" aria-label="">
+            <svg class="mark rotate" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-3.1-6.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v6h-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+          <button class="key turn cw" type="button" data-button="a" aria-label="">
+            <svg class="mark rotate" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-3.1-6.3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20 3v6h-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section id="overlay" aria-label="Game menu" data-menu="cover">
+      <button id="home-settings" type="button" aria-label="" title=""></button>
+      <button id="cover-lang" type="button" aria-label=""><span id="cover-lang-label"></span></button>
+      <div id="panel" class="panel cover">
+        <picture id="art">
+          <img id="cover-image" alt="" draggable="false" hidden>
+          <span id="cover-placeholder" aria-hidden="true">
+            <i class="cover-cell c1"></i><i class="cover-cell c2"></i><i class="cover-cell c3"></i><i class="cover-cell c4"></i>
+            <em>NES</em>
+          </span>
+        </picture>
+
+        <div class="screen" id="cover-screen">
+          <h1 class="game-title" id="game-title"></h1>
+          <p class="game-subtitle" id="game-subtitle"></p>
+          <p class="badge" id="card-badge"></p>
+          <div class="okline" id="rom-done" hidden>
+            <span class="ok-mark" aria-hidden="true">✓</span>
+            <span class="ok-text"><b id="rom-done-title"></b><span id="rom-done-desc"></span></span>
+          </div>
+          <div class="steps">
+            <button id="step-rom" class="step-row on" type="button">
+              <span class="num" aria-hidden="true">1</span>
+              <span class="step-text"><b id="step-rom-title"></b><span id="step-rom-desc"></span></span>
+              <span class="chev" aria-hidden="true">›</span>
+            </button>
+            <button id="step-install" class="step-row" type="button" disabled>
+              <span class="num" aria-hidden="true">2</span>
+              <span class="step-text"><b id="step-install-title"></b><span id="step-install-desc"></span></span>
+              <span class="chev" aria-hidden="true">›</span>
+            </button>
+          </div>
+          <p id="mode-note" class="mode-note" hidden></p>
+          <p id="card-status" class="card-status" role="status" hidden></p>
+          <div id="rom-error" class="rom-error" role="alert" hidden>
+            <b id="rom-error-title"></b>
+            <p id="rom-error-text"></p>
+            <button id="rom-error-retry" class="action primary" type="button"></button>
+          </div>
+          <div class="cover-actions">
+            <button id="card-play" class="action primary" type="button" hidden></button>
+            <button id="card-change-rom" class="action" type="button" hidden></button>
+          </div>
+          <div class="passport" id="passport" hidden>
+            <h2 id="passport-title" data-i18n="passportTitle"></h2>
+            <dl id="passport-rows"></dl>
+            <details id="passport-more" hidden>
+              <summary data-i18n="passportMore"></summary>
+              <dl id="passport-more-rows"></dl>
+            </details>
+          </div>
+          <button id="file-help-link" class="link-button" type="button"></button>
+          <p id="cover-note" class="cover-note"></p>
+          <button id="cover-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
+        </div>
+
+        <div class="screen" id="file-help" hidden>
+          <h1 data-i18n="fileHelpTitle"></h1>
+          <p class="sub" data-i18n="fileHelpSubtitle"></p>
+          <dl class="card-list">
+            <div><dt data-i18n="fileHelpGame"></dt><dd data-i18n="fileHelpGameValue"></dd></div>
+            <div><dt data-i18n="fileHelpFile"></dt><dd data-i18n="fileHelpFileValue"></dd></div>
+            <div><dt data-i18n="fileHelpSize"></dt><dd data-i18n="fileHelpSizeValue"></dd></div>
+            <div><dt data-i18n="fileHelpAccept"></dt><dd data-i18n="fileHelpAcceptValue"></dd></div>
+          </dl>
+          <button id="file-help-choose" class="action primary" type="button" data-i18n="chooseFile"></button>
+          <p class="cover-note" data-i18n="fileHelpNote"></p>
+          <p class="cover-note" data-i18n="fileHelpPrivacy"></p>
+          <button id="file-help-back" class="action" type="button" data-i18n="back"></button>
+        </div>
+
+        <div class="screen" id="install-help" hidden>
+          <h1 data-i18n="installHelpTitle"></h1>
+          <p id="install-help-text" class="sub"></p>
+          <p id="install-help-status" class="card-status" role="status" hidden></p>
+          <div class="menu">
+            <button id="install-help-continue" class="action primary" type="button"></button>
+            <button id="install-help-back" class="action" type="button" data-i18n="back"></button>
+          </div>
+        </div>
+
+        <div class="screen center" id="done-screen" hidden>
+          <div class="big-ok" aria-hidden="true">✓</div>
+          <h1 data-i18n="doneTitle"></h1>
+          <p class="sub" data-i18n="doneSubtitle"></p>
+          <div class="foot"><button id="done-open" class="action primary" type="button" data-i18n="openGame"></button></div>
+        </div>
+
+        <div class="screen" id="home-menu" hidden>
+          <div class="menu">
+            <button class="action primary" id="continue-run" type="button" hidden></button>
+            <button class="action primary" id="play" type="button"></button>
+            <button class="action" id="records" type="button" data-i18n="records"></button>
+            <button class="action" id="change-rom" type="button"></button>
+          </div>
+          <p id="home-status" class="card-status" role="status" hidden></p>
+          <p id="home-mode-note" class="mode-note" hidden></p>
+          <button id="home-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
+        </div>
+
+        <div class="screen" id="setup-menu" hidden>
+          <h1 data-i18n="setupTitle"></h1>
+          <div class="choices" id="setup-choices"></div>
+          <button class="action primary" id="start" type="button" data-i18n="start"></button>
+          <button class="action" id="setup-back" type="button" data-i18n="back"></button>
+        </div>
+
+        <div class="screen" id="pause-menu" hidden>
+          <h1 data-i18n="pauseTitle"></h1>
+          <div class="menu">
+            <button class="action primary" id="resume" type="button" data-i18n="resume"></button>
+            <button class="action" id="pause-settings" type="button" data-i18n="settingsTitle"></button>
+            <button class="action" id="restart" type="button" data-i18n="restart"></button>
+            <button class="action" id="main-menu" type="button" data-i18n="mainMenu"></button>
+          </div>
+          <button id="pause-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
+        </div>
+
+        <div class="screen" id="settings-menu" hidden>
+          <h1 data-i18n="settingsTitle"></h1>
+          <div class="choices" id="settings-choices"></div>
+          <p class="section-title" data-i18n="language"></p>
+          <div class="language-choice" id="settings-languages" role="group">
+            <button type="button" data-language="ru" lang="ru"></button>
+            <button type="button" data-language="en" lang="en"></button>
+          </div>
+          <p class="section-title" data-i18n="installSection"></p>
+          <div id="settings-install"></div>
+          <p class="storage-info" id="storage-info" hidden></p>
+          <button class="action" id="settings-change-rom" type="button"></button>
+          <button class="action" id="settings-legal" type="button"></button>
+          <button class="action primary" id="settings-back" type="button" data-i18n="back"></button>
+        </div>
+
+        <div class="screen" id="legal-screen" hidden>
+          <h1 data-i18n="legalTitle"></h1>
+          <div class="legal-body">
+            <p data-i18n="legalNoGame"></p>
+            <p data-i18n="legalLocal"></p>
+            <p data-i18n="legalTrademarks"></p>
+            <p data-i18n="legalLicense"></p>
+            <p data-i18n="legalRights"></p>
+            <p data-i18n="legalNoFiles"></p>
+          </div>
+          <button class="action primary" id="legal-back" type="button" data-i18n="back"></button>
+        </div>
+
+        <div class="screen" id="records-menu" hidden>
+          <h1 data-i18n="records"></h1>
+          <p id="records-empty" class="empty" hidden data-i18n="emptyRecords"></p>
+          <table id="records-table" hidden>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col" id="records-name"></th>
+                <th scope="col" id="records-score"></th>
+                <th scope="col" id="records-lines"></th>
+              </tr>
+            </thead>
+            <tbody id="record-rows"></tbody>
+          </table>
+          <button class="action primary" id="records-replay" type="button" data-i18n="playAgain" hidden></button>
+          <button class="action primary" id="records-back" type="button"></button>
+        </div>
+
+        <div class="screen" id="record-edit-menu" hidden>
+          <h1 id="record-edit-title" tabindex="-1"></h1>
+          <form id="record-form">
+            <label for="record-input" id="record-label"></label>
+            <input id="record-input" type="text" dir="auto" placeholder="··········"
+                   autocomplete="off" spellcheck="false" enterkeyhint="done" required>
+            <button class="action primary" id="record-submit" type="submit" disabled></button>
+          </form>
+        </div>
+
+        <div class="screen" id="record-confirm-menu" hidden>
+          <h1 id="record-confirm-title"></h1>
+          <p id="record-confirm-name"><bdi></bdi></p>
+          <div class="confirm-actions">
+            <button class="action primary" id="record-confirm-yes" type="button"></button>
+            <button class="action" id="record-confirm-no" type="button"></button>
+          </div>
+        </div>
+
+        <div class="screen" id="confirm-menu" hidden>
+          <h1 id="confirm-title"></h1>
+          <div class="saved-preview">
+            <img id="saved-thumbnail" alt="" hidden>
+            <span id="saved-level"></span>
+          </div>
+          <p id="confirm-note" class="hint" hidden></p>
+          <div class="confirm-actions">
+            <button class="action primary" id="confirm-yes" type="button"></button>
+            <button class="action" id="confirm-no" type="button"></button>
+          </div>
+        </div>
+
+        <p id="notice" role="status" hidden></p>
+      </div>
+      <div id="drop-hint" hidden><span data-i18n="dropHint"></span></div>
+    </section>
+
+    <input id="rom-file" type="file" accept=".nes,application/x-nes-rom,application/octet-stream" hidden>
+    <noscript><p class="noscript">Turn on JavaScript to play.</p></noscript>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

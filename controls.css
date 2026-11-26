@@ -1,0 +1,160 @@
+/* Тач-управление и клавиши. Игровые кнопки — наш CSS, без ассетов из ROM. */
+.pad {
+  --pair-width: 50%;
+  --key-height: 52px;
+  --control-inset: 4px;
+  --turn-inset: 0px;
+  --pause-size: 48px;
+  --cap-width: 48px;
+  --cap-height: 44px;
+  --mark-size: 22px;
+  --rotation-mark-width: 42px;
+  --rotation-mark-size: 26px;
+  --cap-fill: rgba(10, 22, 36, .52);
+  --cap-border: rgba(122, 178, 255, .55);
+  --mark-opacity: .86;
+  --ink-outline: drop-shadow(-1px 0 0 #000) drop-shadow(1px 0 0 #000)
+                 drop-shadow(0 -1px 0 #000) drop-shadow(0 1px 0 #000);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: none;
+  padding: 0;
+  touch-action: none;
+}
+#game[data-scene="play"]:not([inert]) .pad { display: block; }
+
+.pad .moves, .pad .turns {
+  position: absolute;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: var(--pair-width);
+  height: var(--key-height);
+  padding: 0;
+}
+.pad .moves { left: 0; }
+.pad .turns { right: var(--turn-inset); }
+.pad .key {
+  position: relative;
+  width: 50%;
+  height: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  outline-offset: -3px;
+  color: #fff;
+  touch-action: none;
+}
+.pad .mark { position: relative; z-index: 1; pointer-events: none; opacity: var(--mark-opacity); }
+.pad .mark.arrow { width: var(--mark-size); height: var(--mark-size); fill: #fff; filter: var(--ink-outline); }
+.pad .mark.rotate { width: var(--rotation-mark-size); height: var(--rotation-mark-size); color: #fff; filter: var(--ink-outline); }
+.pad .direction.left .mark.arrow { transform: none; }
+.pad .direction.right .mark.arrow { transform: scaleX(-1); }
+.pad .direction.down .mark.arrow { transform: rotate(-90deg); }
+
+/* Кнопки поворота: одна дуга зеркалится для противоположного направления. */
+.pad .turns .key.ccw .mark.rotate { transform: scaleX(-1); }
+
+.pad > .down {
+  position: absolute;
+  right: max(5px, calc(12.5% - 32px));
+  top: 61%;
+  transform: translateY(-50%);
+  width: 64px;
+  height: 58px;
+}
+
+.pad .utility {
+  position: absolute;
+  top: 4px;
+  right: var(--control-inset);
+  width: var(--pause-size);
+  height: var(--pause-size);
+  border: 2px solid var(--cap-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, .55);
+  box-shadow: inset 0 0 0 2px rgba(19, 66, 99, .55);
+}
+.pad .utility::before {
+  content: '';
+  width: 18px;
+  height: 20px;
+  border-left: 6px solid var(--ice);
+  border-right: 6px solid var(--ice);
+  box-sizing: border-box;
+}
+.pad .key:is(.held, :active) { --mark-opacity: 1; --cap-fill: rgba(22, 59, 88, .82); --cap-border: rgba(190, 242, 255, .9); }
+.pad .key:focus-visible { outline: 2px solid var(--sky); }
+
+/* Контур кнопки: наш простой прямоугольник вместо рамки из ROM. */
+.pad .moves .key::after, .pad .turns::after, .pad > .down::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  box-sizing: border-box;
+  width: var(--cap-width);
+  height: var(--cap-height);
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--cap-border);
+  border-radius: 11px;
+  background: var(--cap-fill);
+  pointer-events: none;
+  opacity: .9;
+}
+.pad .turns::after { width: var(--rotation-mark-width); height: var(--cap-height); }
+
+@media (orientation: landscape) {
+  .pad { --pair-width: min(28%, 202px); --turn-inset: 6px; }
+  .pad .moves { left: 6px; }
+  .pad > .down {
+    --drop-target-height: clamp(76px, 28%, 116px);
+    right: 0;
+    top: min(63%, calc(100% - 66px - var(--drop-target-height) / 2));
+    width: clamp(104px, 18%, 144px);
+    height: var(--drop-target-height);
+  }
+}
+
+@media (orientation: portrait) {
+  #game {
+    --portrait-drop-width: 76px;
+    --portrait-drop-top: 45%;
+    --portrait-controls-height: 54px;
+  }
+  .pad .moves, .pad .turns { bottom: 3px; }
+  :root[data-iphone] #game { --portrait-drop-width: 64px; }
+  :root[data-iphone] .pad .moves, :root[data-iphone] .pad .turns {
+    bottom: max(3px, min(8px, var(--device-safe-bottom)));
+  }
+  .pad > .down {
+    top: var(--portrait-drop-top);
+    right: 0;
+    transform: none;
+    width: var(--portrait-drop-width);
+    height: clamp(88px, 26%, 200px);
+  }
+}
+
+@media (orientation: portrait) {
+  .pad .moves .key { --cap-width: calc(100% - 8px); }
+  .pad .turns { --rotation-mark-width: 52px; }
+}
+.pad > .down { --cap-width: 46px; --cap-height: 78px; }
+
+@media (orientation: landscape) {
+  .pad .moves .key { --cap-width: calc(100% - 8px); }
+  .pad .turns { --cap-width: calc(100% - 4px); --rotation-mark-width: 52px; }
+  .pad > .down { --cap-width: 72px; --mark-size: 26px; --rotation-mark-size: 28px; }
+  .pad .turns::after, .pad > .down::after {
+    left: auto;
+    transform: translateY(-50%);
+  }
+  .pad .turns::after { right: calc(var(--control-inset) - var(--turn-inset)); }
+  .pad > .down::after { right: var(--control-inset); }
+}
