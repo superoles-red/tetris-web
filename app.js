@@ -1346,7 +1346,7 @@ function buildSettingsChoices() {
   addChoice('settings-choices', 'music', VOLUMES, () => settings.musicVolume, (n) => { settings.musicVolume = n; },
     (value) => value ? value + '%' : t.off);
   addChoice('settings-choices', 'track', [SHUFFLE, ...TRACKS], () => settings.track, (n) => { settings.track = n; },
-    (value) => value === SHUFFLE ? t.shuffle : String(value));
+    (value) => value === SHUFFLE ? t.shuffle : (t.trackNames.split('|')[value - 1] ?? String(value)));
 }
 
 // --- обработчики интерфейса ------------------------------------------------

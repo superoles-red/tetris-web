@@ -52,6 +52,46 @@ function checksum(bytes) {
   return sum >>> 0;
 }
 
+
+/** Знаки препинания и символы в стиле игрового шрифта (наш рисунок). */
+const PUNCTUATION = {
+  '?': ['........', '.#####..', '##...##.', '....###.', '...###..', '...##...', '........', '...##...'],
+  '!': ['........', '...##...', '...##...', '...##...', '...##...', '...##...', '........', '...##...'],
+  '.': ['........', '........', '........', '........', '........', '........', '........', '...##...'],
+  ',': ['........', '........', '........', '........', '........', '........', '...##...', '..##....'],
+  ':': ['........', '........', '...##...', '...##...', '........', '...##...', '...##...', '........'],
+  '-': ['........', '........', '........', '.#####..', '........', '........', '........', '........'],
+  '—': ['........', '........', '........', '########', '........', '........', '........', '........'],
+  '…': ['........', '........', '........', '........', '........', '........', '........', '##.##.##'],
+  '/': ['........', '.....##.', '....##..', '...##...', '..##....', '.##.....', '##......', '........'],
+  '(': ['........', '...###..', '..##....', '.##.....', '.##.....', '..##....', '...###..', '........'],
+  ')': ['........', '.###....', '...##...', '....##..', '....##..', '...##...', '.###....', '........'],
+  '«': ['........', '........', '..##.##.', '.##.##..', '##.##...', '.##.##..', '..##.##.', '........'],
+  '»': ['........', '........', '##.##...', '.##.##..', '..##.##.', '.##.##..', '##.##...', '........'],
+  '%': ['........', '##...##.', '##..##..', '...##...', '..##....', '.##..##.', '##...##.', '........'],
+  '\'': ['........', '...##...', '...##...', '........', '........', '........', '........', '........'],
+  '·': ['........', '........', '........', '...##...', '...##...', '........', '........', '........'],
+};
+
+function builtinGlyph(name) {
+  const rows = PUNCTUATION[name];
+  if (!rows) return null;
+  const out = new Uint8Array(8);
+  for (let y = 0; y < 8; y++) {
+    let bits = 0;
+    for (let x = 0; x < 8; x++) if (rows[y][x] === '#') bits |= 0x80 >> x;
+    out[y] = bits;
+  }
+  return out;
+}
+
+/** Сдвиг глифа вниз на одну строку: у перевода PSCD буквы на 6 строк ниже, чем в EN. */
+function shiftDown(rows) {
+  const out = new Uint8Array(8);
+  for (let y = 1; y < 8; y++) out[y] = rows[y - 1] ?? 0;
+  return out;
+}
+
 /** 8 строк по 8 бит из plane 0 CHR-тайла. */
 export function glyphFromChr(chr, tileIndex) {
   const base = tileIndex * 16;
@@ -242,13 +282,25 @@ export function glyphsFromRom(chr, language = 'en') {
   const glyphs = new Map();
   glyphs.set(' ', new Uint8Array(8));
   const bank = chr.subarray(0, 8192);
-  for (const ch of LATIN) glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
   if (language === 'ru') {
-    for (const [ch, index] of Object.entries(RUSSIAN_TILES)) glyphs.set(ch, glyphFromChr(bank, index));
+    // Перевод PSCD: 6-строчные буквы поднимаем на базовую линию, чтобы
+    // они смотрелись как английский шрифт из той же игры.
+    for (const ch of '0123456789') {
+      glyphs.set(ch, shiftDown(glyphFromChr(bank, ch.charCodeAt(0))));
+    }
+    for (const [ch, index] of Object.entries(RUSSIAN_TILES)) {
+      glyphs.set(ch, shiftDown(glyphFromChr(bank, index)));
+    }
     const sh = glyphs.get('Ш')?.slice() ?? new Uint8Array(8);
     const tse = glyphs.get('Ц')?.slice() ?? new Uint8Array(8);
     sh[7] = tse[7] ?? 0;
     glyphs.set('Щ', sh);
+  } else {
+    for (const ch of LATIN) glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
+  }
+  for (const ch of Object.keys(PUNCTUATION)) {
+    const glyph = builtinGlyph(ch);
+    if (glyph) glyphs.set(ch, glyph);
   }
   return glyphs;
 }
