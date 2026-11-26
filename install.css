@@ -1,48 +1,10 @@
-/* Шаг 2: установка PWA. Нативные диалоги рисует браузер; здесь — наши
-   экраны подсказки и «Готово». Никаких ассетов из игры. */
-
-#install-help-text {
-  font-size: 13.5px;
-  line-height: 1.5;
-  text-align: center;
-  color: var(--text);
-}
-#install-help-status { text-align: center; font-size: 12px; }
-#install-help-status.ready { color: var(--green); }
-#install-help-status.failed { color: var(--red); }
-#install-help .menu { margin-top: 6px; }
-
-.big-ok {
-  width: 86px;
-  height: 86px;
-  margin: 18px auto 4px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 42px;
-  color: var(--green);
-  background: rgba(61, 220, 132, .14);
-  border: 1px solid rgba(61, 220, 132, .4);
-}
-#done-screen .foot { width: 100%; margin-top: 10px; }
-#done-screen .foot .action { width: 100%; }
-#done-screen h1 { margin-top: 4px; }
-
-#settings-install > button { width: 100%; }
-#settings-install:empty { display: none; }
-#settings-install { display: grid; gap: 8px; }
-
-#settings-install .installed-note {
-  margin: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(61, 220, 132, .08);
-  border: 1px solid rgba(61, 220, 132, .3);
-  color: var(--green);
-  font-size: 12.5px;
-  text-align: center;
-}
-
-@media (max-width: 380px) {
-  #install-help-text { font-size: 12.5px; }
-}
+/* Экран установки — в том же стиле, что и остальные панели: минимум текста. */
+#install-help { gap: clamp(8px, 2dvh, 14px); }
+#install-help h1 { text-transform: uppercase; }
+#install-help .hint { color: var(--ice); max-width: 30ch; }
+#install-help .card-status { min-height: 16px; }
+#install-help .card-status.ready { color: #6fe08f; }
+#install-help .card-status.failed { color: #ff7981; }
+#settings-install { width: 100%; }
+#settings-install .action { min-height: 40px; font-size: clamp(11px, 3.2vw, 14px); }
+.install-hint-row { margin: 0; color: var(--stone); font: 400 11px/1.4 system-ui, -apple-system, sans-serif; }

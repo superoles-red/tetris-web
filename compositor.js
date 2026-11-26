@@ -75,6 +75,8 @@ export class Compositor {
     this.sourceCtx = this.source.getContext('2d', { alpha: false });
     this.image = this.sourceCtx.createImageData(SRC_WIDTH, 272);
     this.pixels = new Uint32Array(this.image.data.buffer);
+    this.wellImage = null;
+    this.wellImageReady = false;
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.resize();
@@ -228,12 +230,30 @@ export class Compositor {
       round(width) - line, round(height) - line);
   }
 
+  // Рамка колодца из кадра самой игры (генерируется из ROM, см. app.js).
+  setWellFrame(url) {
+    if (!url) return;
+    const image = new Image();
+    image.onload = () => {
+      this.wellImage = image;
+      this.wellImageReady = true;
+    };
+    image.src = url;
+  }
+
   well(left, top, k) {
     const x = left + 4 * k, y = top + 4 * k;
     this.wellRect = [round(left), round(top), round(WELL_W * k), round(WELL_H * k)];
     this.ctx.fillStyle = '#000';
     this.ctx.fillRect(...this.wellRect);
-    this.bezel(this.wellRect[0], this.wellRect[1], this.wellRect[2], this.wellRect[3], k);
+    if (this.wellImageReady && this.wellImage) {
+      const previous = this.ctx.imageSmoothingEnabled;
+      this.ctx.imageSmoothingEnabled = false;
+      this.ctx.drawImage(this.wellImage, ...this.wellRect);
+      this.ctx.imageSmoothingEnabled = previous;
+    } else {
+      this.bezel(this.wellRect[0], this.wellRect[1], this.wellRect[2], this.wellRect[3], k);
+    }
     if (this.scene === 'dance') {
       this.dance(x, y, k);
       return;
