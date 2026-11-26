@@ -88,6 +88,45 @@ export function buildFrameImage(chr) {
   return canvas;
 }
 
+/**
+ * Рамка 48×48 (углы/кромки по 16 px) прямо из синей рамки титульного экрана:
+ * нативный масштаб, без сжатия — как в самой игре.
+ */
+export function buildBraidFrameUrl(titleBuffer) {
+  if (!titleBuffer || titleBuffer.length < 256 * 240) return null;
+  const boxes = {
+    tl: [16, 16], tr: [224, 16], bl: [16, 208], br: [224, 208],
+    t: [48, 16], b: [48, 208], l: [16, 48], r: [224, 48]
+  };
+  const canvas = makeCanvas(48, 48);
+  if (!canvas) return null;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#000';
+  context.fillRect(0, 0, 48, 48);
+  context.imageSmoothingEnabled = false;
+  const put = ([x, y], dx, dy) => {
+    for (let row = 0; row < 16; row++) {
+      for (let col = 0; col < 16; col++) {
+        const value = titleBuffer[(y + row) * 256 + x + col];
+        context.fillStyle = `rgb(${value & 0xff}, ${(value >> 8) & 0xff}, ${(value >> 16) & 0xff})`;
+        context.fillRect(dx + col, dy + row, 1, 1);
+      }
+    }
+  };
+  put(boxes.tl, 0, 0);
+  put(boxes.tr, 32, 0);
+  put(boxes.bl, 0, 32);
+  put(boxes.br, 32, 32);
+  put(boxes.t, 16, 0);
+  put(boxes.b, 16, 32);
+  put(boxes.l, 0, 16);
+  put(boxes.r, 32, 16);
+  // центр — чёрный
+  context.fillStyle = '#000';
+  context.fillRect(16, 16, 16, 16);
+  return toDataUrl(canvas);
+}
+
 /** 40×40 рамка как data URL. */
 export function buildFrameUrl(chr) {
   const canvas = buildFrameImage(chr);
@@ -232,7 +271,7 @@ export async function applyGameSkin(options = {}) {
     font: null,
     arrow: options.chr ? buildArrowUrl(options.chr) : null,
     block: buildBlockPatternUrl(options.titleBuffer),
-    frame: options.chr ? buildFrameUrl(options.chr) : null,
+    frame: buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
     title: buildTitleArtUrl(options.titleBuffer),
     well: buildWellFrameUrl(options.chr),
   };
