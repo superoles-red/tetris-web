@@ -24,3 +24,10 @@ jobs:
         run: npm test
       - name: CPU conformance ROM (fetched, not committed)
         run: node tools/fetch-cpu-test.mjs && node tests/cpu-conformance.mjs
+      - name: Build static site (no game data allowed)
+        run: node tools/build-site.mjs --output "$RUNNER_TEMP/site"
+      - name: Assert site artifact has no ROM/archives
+        run: |
+          if find "$RUNNER_TEMP/site" -type f \( -iname '*.nes' -o -iname '*.zip' \) | grep -q .; then
+            echo 'Game data found in site artifact'; exit 1
+          fi

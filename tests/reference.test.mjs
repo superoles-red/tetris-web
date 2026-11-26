@@ -37,8 +37,7 @@ test('сценарий: формы событий и удержания', () => 
   assert.deepEqual(scenario, [
     { frame: 100, down: [3], up: [] },
     { frame: 104, down: [], up: [3] },
-    { frame: 140, down: [0], up: [6] },
-    { frame: 141, down: [], up: [0] }, // down без hold держится 1 кадр
+    { frame: 140, down: [0], up: [6] }, // явные фронты: без авто-отпуска
     { frame: 200, down: [5], up: [] },
     { frame: 203, down: [], up: [5] },
     { frame: 300, down: [1], up: [0] },

@@ -105,6 +105,14 @@ export function normalizeScenario(input) {
       ...buttonList(event.buttons, where),
     ];
     const up = [...buttonList(event.up, where), ...buttonList(event.release, where)];
+    // Явные down/up — это фронты: down держится, пока не будет up. Авто-отпуск
+    // после кадра применяется только к форме buttons/press (+hold/until).
+    const hasPressForm =
+      event.buttons !== undefined ||
+      event.press !== undefined ||
+      event.release !== undefined ||
+      event.hold !== undefined ||
+      event.until !== undefined;
 
     let start = event.frame;
     if (start === undefined) start = event.from;
@@ -118,8 +126,8 @@ export function normalizeScenario(input) {
       const length = Number(hold);
       if (!Number.isInteger(length) || length < 1) throw new Error(`${where}: hold должен быть >= 1.`);
       holdEnd = start + length;
-    } else if (down.length) {
-      holdEnd = start + 1; // по умолчанию кнопки держатся ровно один кадр
+    } else if (down.length && hasPressForm) {
+      holdEnd = start + 1; // форма buttons/press без hold держится ровно один кадр
     }
 
     atomic.push({ frame: start, down: [...new Set(down)], up: [...new Set(up)] });

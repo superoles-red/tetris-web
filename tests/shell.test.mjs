@@ -188,6 +188,9 @@ test('app.js импортирует только существующие лок
   if (!existsSync(join(root, 'src/nes/engine.js'))) {
     test.diagnostic?.('src/nes/engine.js ещё не готов — страница заработает после интеграции движка');
   }
+  for (const id of ['cover-legal', 'home-legal', 'settings-legal', 'pause-legal', 'legal-back']) {
+    assert.ok(app.includes(`byId('${id}').onclick`), `app.js не обрабатывает #${id}`);
+  }
 });
 
 test('нет незакоммиченных игровых ассетов в assets/', async () => {
@@ -229,6 +232,42 @@ test('сборка сайта собирается и в артефакте не
   } finally {
     await rm(output, { recursive: true, force: true });
   }
+});
+
+test('есть правовой экран с дисклеймером на RU/EN', async () => {
+  const { translations } = await import('../locale.js');
+  const ids = extractIds(html);
+  for (const id of ['legal-screen', 'legal-back', 'cover-legal', 'home-legal', 'settings-legal', 'pause-legal']) {
+    assert.ok(ids.has(id), `нет id="${id}"`);
+  }
+  const keys = ['legalTitle', 'legalLink', 'legalNoGame', 'legalLocal', 'legalTrademarks',
+    'legalLicense', 'legalRights', 'legalNoFiles'];
+  const used = new Set([...html.matchAll(/data-i18n="(legal[A-Za-z]+)"/g)].map(match => match[1]));
+  const paragraphKeys = keys.filter(key => key.startsWith('legal') && !['legalTitle', 'legalLink'].includes(key));
+  for (const key of keys) {
+    for (const language of ['en', 'ru']) {
+      assert.equal(typeof translations[language][key], 'string', `нет ключа ${language}.${key}`);
+      assert.ok(translations[language][key].length > 3, `${language}.${key} пустой`);
+    }
+    assert.ok(used.has(key), `index.html не выводит ${key}`);
+  }
+  for (const key of paragraphKeys) {
+    for (const language of ['en', 'ru']) {
+      assert.ok(translations[language][key].length > 40, `${language}.${key} слишком короткий для абзаца`);
+    }
+  }
+  for (const language of ['en', 'ru']) {
+    const text = keys.map(key => translations[language][key]).join(' ');
+    assert.ok(text.length > 500, `${language}: дисклеймер слишком короткий`);
+    for (const marker of ['ROM', 'MIT', 'github.com/superoles-red/tetris-web', 'Tetris', 'Tengen', 'Nintendo', 'WebAssembly']) {
+      assert.ok(text.includes(marker), `${language}: в дисклеймере нет «${marker}»`);
+    }
+    assert.match(text, /issue|тикет|обращ/i, `${language}: нет способа связаться по правам`);
+  }
+  // Никаких ссылок на пиратские источники.
+  const all = keys.flatMap(key => [translations.en[key], translations.ru[key]]).join(' ');
+  assert.doesNotMatch(all, /torrent|pirat|coolrom|emuparadise|romsgames|free-?rom/i);
+  // Дисклеймер не прячет игровые файлы: в репозитории их по-прежнему нет (проверено выше).
 });
 
 test('tools/make-icons.mjs существует и не требует внешних зависимостей', async () => {

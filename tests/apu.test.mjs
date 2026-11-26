@@ -5,10 +5,15 @@
 // 2) Детерминизм: advance(большими порциями) ≡ advance(малыми порциями).
 // 3) Полное сохранение состояния (toJSON/fromJSON).
 // 4) Дифференциальный тест с JSNES 2.1.0 на реальных ROM: сценарий с музыкой
-//    и эффектами, запись таймлайна регистровых записей, воспроизведение того
-//    же таймлайна через наш APU и сравнение формы сигнала (корреляция по
-//    окнам 30 мс, RMS-отношение, спектральное сходство). Без ROM тест
-//    пропускается; ROM в репозиторий не копируется, WAV — только в /tmp.
+//    и эффектами (Start/Left/Right/Down/A, 480 кадров), запись таймлайна
+//    регистровых записей (адрес, значение, номер такта CPU), воспроизведение
+//    того же таймлайна через наш APU и сравнение формы сигнала: корреляция
+//    по окнам 30 мс (шаг 10 мс), RMS-отношение, спектральное сходство.
+//    Свободно бегущие фазы делителей синхронизируются со снимком JSNES в
+//    момент t0: на железе эта фаза произвольна, сравнивать нужно форму.
+//    Оба сигнала одинаково фильтруются ВЧ (скользящее среднее 5 мс).
+//    Без ROM тест пропускается; ROM в репозиторий не копируется, WAV и
+//    JSON-отчёт пишутся только в /tmp.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -1109,7 +1114,9 @@ async function runDifferential(romPath, frameCount) {
   // целочисленный DC-фильтр замирает на смещении до 1023/32768 в тишине,
   // и это не должно считаться «звуком».
   const refGlobalAc = acRms(ref2);
-  const activeThreshold = Math.max(1e-4, refGlobalAc * 0.2);
+  // Сравниваем окна с заметным уровнем: ниже 35% от глобального AC-RMS —
+  // это тишина/затухания, где у JSNES доминирует артефакт DC-фильтра.
+  const activeThreshold = Math.max(1e-4, refGlobalAc * 0.35);
   let skippedQuietWindows = 0;
   for (let start = 0; start + windowSize <= ref2.length; start += hop) {
     const refWindow = ref2.slice(start, start + windowSize);
@@ -1230,32 +1237,41 @@ for (const romPath of existingRoms) {
   test(`APU: дифференциальный тест с JSNES на ROM ${romPath.split(/[/\\]/).pop()}`, { timeout: 180000 }, async () => {
     const { metrics } = await runDifferential(romPath, 480);
     // Отчёт в /tmp: цифры сравнения и WAV-файлы для ручного прослушивания.
-    writeFileSync('/tmp/apu-diff-report.json', JSON.stringify(metrics, null, 2) + '\n');
+    const reportPath = `/tmp/apu-diff-report-${metrics.rom.replace(/[^a-z0-9._-]/gi, '_')}.json`;
+    writeFileSync(reportPath, JSON.stringify(metrics, null, 2) + '\n');
     console.log('[APU diff]', JSON.stringify(metrics));
+    console.log(
+      `[APU diff] ${metrics.rom}: окон ${metrics.activeWindows} по 30 мс; ` +
+        `корреляция mean=${metrics.correlationMean} median=${metrics.correlationMedian} p10=${metrics.correlationP10}; ` +
+        `RMS=${metrics.rmsRatioMedian} (p10..p90 ${metrics.rmsRatioP10}..${metrics.rmsRatioP90}); ` +
+        `спектр=${metrics.spectralMean}; отчёт ${reportPath}`,
+    );
 
-    assert.ok(metrics.activeWindows >= 100, `мало активных окон: ${metrics.activeWindows}`);
+    assert.ok(metrics.activeWindows >= 300, `мало активных окон: ${metrics.activeWindows}`);
     assert.ok(metrics.refSamples > 0 && metrics.ourSamples > 0);
     // Форма сигнала должна совпадать в пределах тайминговых допусков.
-    // Эталонные значения на этих дампах: медиана корреляции ≈0.998,
-    // среднее ≈0.95, p10 ≈0.91, RMS-отношение ≈1.00, спектр ≈0.98.
+    // Измеренные значения на этих дампах: медиана корреляции ≈0.998,
+    // среднее ≈0.988, p10 ≈0.977, RMS-отношение ≈1.005, спектр ≈0.99.
+    // Худшие окна (0.62..0.80) — тихие переходы/затухания и редкие шумовые
+    // эффекты, где у JSNES сказывается квантование таймингов; см. worstWindows.
     assert.ok(
-      metrics.correlationMedian > 0.95,
+      metrics.correlationMedian > 0.98,
       `медианная корреляция по 30-мс окнам слишком низкая: ${metrics.correlationMedian.toFixed(3)}`,
     );
     assert.ok(
-      metrics.correlationMean > 0.8,
+      metrics.correlationMean > 0.95,
       `средняя корреляция слишком низкая: ${metrics.correlationMean.toFixed(3)}`,
     );
     assert.ok(
-      metrics.correlationP10 > 0.5,
+      metrics.correlationP10 > 0.9,
       `p10 корреляции слишком низкий: ${metrics.correlationP10.toFixed(3)}`,
     );
     assert.ok(
-      metrics.rmsRatioMedian > 0.8 && metrics.rmsRatioMedian < 1.25,
+      metrics.rmsRatioMedian > 0.9 && metrics.rmsRatioMedian < 1.1,
       `RMS-отношение вне допуска: ${metrics.rmsRatioMedian.toFixed(3)}`,
     );
     assert.ok(
-      metrics.spectralMean > 0.9,
+      metrics.spectralMean > 0.95,
       `спектральное сходство слишком низкое: ${metrics.spectralMean.toFixed(3)}`,
     );
   });

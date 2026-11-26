@@ -102,6 +102,7 @@
           </div>
           <button id="file-help-link" class="link-button" type="button"></button>
           <p id="cover-note" class="cover-note"></p>
+          <button id="cover-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
         </div>
 
         <div class="screen" id="file-help" hidden>
@@ -145,6 +146,7 @@
           </div>
           <p id="home-status" class="card-status" role="status" hidden></p>
           <p id="home-mode-note" class="mode-note" hidden></p>
+          <button id="home-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
         </div>
 
         <div class="screen" id="setup-menu" hidden>
@@ -162,6 +164,7 @@
             <button class="action" id="restart" type="button" data-i18n="restart"></button>
             <button class="action" id="main-menu" type="button" data-i18n="mainMenu"></button>
           </div>
+          <button id="pause-legal" class="link-button legal-link" type="button" data-i18n="legalLink"></button>
         </div>
 
         <div class="screen" id="settings-menu" hidden>
@@ -176,7 +179,21 @@
           <div id="settings-install"></div>
           <p class="storage-info" id="storage-info" hidden></p>
           <button class="action" id="settings-change-rom" type="button"></button>
+          <button class="action" id="settings-legal" type="button"></button>
           <button class="action primary" id="settings-back" type="button" data-i18n="back"></button>
+        </div>
+
+        <div class="screen" id="legal-screen" hidden>
+          <h1 data-i18n="legalTitle"></h1>
+          <div class="legal-body">
+            <p data-i18n="legalNoGame"></p>
+            <p data-i18n="legalLocal"></p>
+            <p data-i18n="legalTrademarks"></p>
+            <p data-i18n="legalLicense"></p>
+            <p data-i18n="legalRights"></p>
+            <p data-i18n="legalNoFiles"></p>
+          </div>
+          <button class="action primary" id="legal-back" type="button" data-i18n="back"></button>
         </div>
 
         <div class="screen" id="records-menu" hidden>

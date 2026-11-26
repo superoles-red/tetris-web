@@ -18,7 +18,7 @@ import { readFile } from 'node:fs/promises';
 import { writeFile } from 'node:fs/promises';
 import { sha256Hex } from './hashing.mjs';
 import { runJsnes, JSNES_VERSION } from './jsnes-runner.mjs';
-import { normalizeScenario, SCENARIOS } from './scenario.mjs';
+import { normalizeScenario, parseScenarioText, SCENARIOS } from './scenario.mjs';
 import { capturePpuState } from './ppu-state.mjs';
 import { isMain, parseArgs, intOption, intListOption, formatError } from './cli.mjs';
 
@@ -40,39 +40,20 @@ export async function runReferenceFile(options) {
   return result;
 }
 
-/** Разбор --scenario/--input/--press в сценарий. */
+/** Разбор --scenario/--press в нормализованный сценарий. */
 export function resolveScenario(args) {
-  const parts = [];
+  const events = [];
   if (args.scenario !== undefined) {
     const name = String(args.scenario);
     if (!(name in SCENARIOS)) {
       throw new Error(`Неизвестный сценарий "${name}". Доступно: ${Object.keys(SCENARIOS).join(', ')}.`);
     }
-    parts.push(...SCENARIOS[name]);
+    events.push(...SCENARIOS[name]);
   }
   if (args.press !== undefined) {
-    const items = [].concat(args.press).join(',');
-    parts.push(...normalizeScenario(items.length ? { events: parsePressItems(items) } : []));
+    events.push(...parseScenarioText([].concat(args.press).join(',')));
   }
-  if (args.input !== undefined) {
-    throw new Error('Файл сценария передаётся через --input: чтение выполняется CLI-обёрткой.');
-  }
-  return parts;
-}
-
-function parsePressItems(text) {
-  // "start@100+4,a@140+4" → события {frame, buttons, hold}
-  return text
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean)
-    .map(item => {
-      const match = /^([a-z0-9+]+)@(\d+)(?:\+(\d+))?$/i.exec(item);
-      if (!match) throw new Error(`Неверный --press "${item}". Формат: кнопка@кадр[+удержание].`);
-      const event = { frame: Number(match[2]), buttons: match[1].split('+') };
-      if (match[3] !== undefined) event.hold = Number(match[3]);
-      return event;
-    });
+  return normalizeScenario(events);
 }
 
 const HELP = `

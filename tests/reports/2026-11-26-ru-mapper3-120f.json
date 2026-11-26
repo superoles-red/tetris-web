@@ -1,7 +1,7 @@
 {
   "tool": "compare",
   "version": 1,
-  "generatedAt": "2026-11-26T08:17:45.587Z",
+  "generatedAt": "2026-11-26T08:18:34.913Z",
   "note": "Отчёт сравнения: только хэши и метаданные, без ROM и без дампов памяти.",
   "rom": {
     "sha256": "33f04ac3953e7d6d3dd88083cd6f90ffddc805683d20fa8407d8c2d835b11d46",
@@ -875,7 +875,7 @@
       "sha256": "32cf06dde26f4dfdcfcc9183d5a657ab865e07233d921d95b86a235ac1089cde"
     },
     "pngFiles": [],
-    "elapsedMs": 158
+    "elapsedMs": 159
   },
   "ours": {
     "engine": "ours",
@@ -1615,7 +1615,7 @@
       "sha256": "7103f81daca464818d42aa77e5e8d2752c34ad75a43d9de1f2dc5e697d83000f"
     },
     "pngFiles": [],
-    "elapsedMs": 221
+    "elapsedMs": 231
   },
   "comparison": {
     "identical": false,

@@ -853,8 +853,6 @@ export class APU {
         DAC.tnd[tndIndex >= 0 && tndIndex < DAC.tnd.length ? tndIndex : DAC.tnd.length - 1] -
         DAC.dc) *
       DAC_SCALE;
-    /** Сырое (до DC-блокера) значение последнего сэмпла — для диагностики/тестов. */
-    this.lastRawSample = raw;
 
     // AC-связь выходного каскада: y[n] = (x[n] - x[n-1]) + R*y[n-1].
     if (!this.dcReady) {

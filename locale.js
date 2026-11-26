@@ -178,6 +178,16 @@ export const translations = {
     unitKB: 'KB',
     unitMB: 'MB',
 
+    // Legal
+    legalLink: 'ABOUT & LEGAL',
+    legalTitle: 'About & legal',
+    legalNoGame: 'We do not ship the original game. The game is data: you bring your own ROM. We only provide the shell and our static recompiler.',
+    legalLocal: 'Your file is never uploaded to a server and never leaves your device: the conversion to WebAssembly happens locally, in your browser.',
+    legalTrademarks: 'This project is not affiliated with the rights holders. Tetris, Tengen, Nintendo, Elorg and related marks belong to their owners.',
+    legalLicense: 'The shell and recompiler code is MIT. Sources: github.com/superoles-red/tetris-web. Third-party components and their licenses are listed in THIRD_PARTY_NOTICES.md.',
+    legalRights: 'If you are a rights holder and believe this project infringes your rights, please open an issue in the repository: we will react quickly and take the page down (kill switch).',
+    legalNoFiles: 'There are no game files in the repository. The cover on the game screen is rendered from your ROM inside your browser and stored only in local device storage.',
+
     // Accessibility
     ariaMachine: 'Tengen Tetris',
     ariaGame: 'Game',
@@ -367,6 +377,16 @@ export const translations = {
     unitBytes: 'Б',
     unitKB: 'КБ',
     unitMB: 'МБ',
+
+    // Legal
+    legalLink: 'О ПРОЕКТЕ И ПРАВАХ',
+    legalTitle: 'О проекте и правах',
+    legalNoGame: 'Мы не поставляем оригинальную игру. Игра — это данные: ROM приносит сам игрок. У нас только оболочка и наш статический перекомпилятор.',
+    legalLocal: 'Ваш файл не загружается на сервер и не покидает устройство: конвертация в WebAssembly происходит локально, в вашем браузере.',
+    legalTrademarks: 'Проект не связан с правообладателями. Tetris, Tengen, Nintendo, Elorg и связанные знаки принадлежат их владельцам.',
+    legalLicense: 'Код оболочки и перекомпилятора — MIT. Исходники: github.com/superoles-red/tetris-web. Сторонние компоненты и их лицензии — в THIRD_PARTY_NOTICES.md.',
+    legalRights: 'Если вы правообладатель и считаете проект нарушающим ваши права — напишите нам через issue в репозитории, мы отреагируем быстро и отключим страницу (kill switch).',
+    legalNoFiles: 'Игровых файлов в репозитории нет. Обложка на экране игры отрисовывается из вашего ROM в вашем браузере и хранится только в локальном хранилище устройства.',
 
     // Accessibility
     ariaMachine: 'Тетрис (Tengen)',

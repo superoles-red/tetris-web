@@ -46,13 +46,14 @@ const VIEW_ELEMENTS = {
   records: 'records-menu',
   'record-edit': 'record-edit-menu',
   'record-confirm': 'record-confirm-menu',
-  confirm: 'confirm-menu'
+  confirm: 'confirm-menu',
+  legal: 'legal-screen'
 };
 const FOCUS_ORDER = {
   cover: 'step-rom', 'file-help': 'file-help-choose', 'install-help': 'install-help-continue',
   done: 'done-open', home: 'play', setup: 'start', pause: 'resume', settings: 'settings-back',
   records: 'records-back', 'record-edit': 'record-edit-title', 'record-confirm': 'record-confirm-no',
-  confirm: 'confirm-no'
+  confirm: 'confirm-no', legal: 'legal-back'
 };
 const BUTTON_LABELS = { left: 'ariaLeft', right: 'ariaRight', down: 'ariaDown', a: 'ariaA', b: 'ariaB' };
 const PLATFORM_KEYS = {
@@ -78,6 +79,7 @@ const settings = {
 let t = translations[settings.language];
 let view = 'cover';
 let settingsReturn = 'home';
+let legalReturn = 'cover';
 let store = null;
 let storeError = null;
 let installer = null;
@@ -1254,11 +1256,19 @@ function confirmRun(intent) {
   menu('confirm');
 }
 
+// Правовой экран: доступен с карточки, из меню, паузы и настроек.
+function openLegal() {
+  const from = ['cover', 'home', 'settings', 'pause', 'legal'].includes(view) ? view : 'cover';
+  legalReturn = from === 'legal' ? legalReturn : from;
+  menu('legal');
+}
+
 // --- экран настроек --------------------------------------------------------
 function renderChrome() {
   renderSettingsInstall();
   byId('settings-change-rom').textContent = t.changeRom;
   byId('settings-change-rom').hidden = !rom;
+  byId('settings-legal').textContent = t.legalLink;
 }
 
 async function renderStorageInfo() {
@@ -1389,6 +1399,11 @@ byId('install-help-continue').onclick = () => {
 byId('install-help-back').onclick = () => menu('cover');
 byId('done-open').onclick = () => { unlockMenuMusic(); menu('home'); };
 byId('rom-error-retry').onclick = () => openFilePicker();
+byId('cover-legal').onclick = openLegal;
+byId('home-legal').onclick = openLegal;
+byId('pause-legal').onclick = openLegal;
+byId('settings-legal').onclick = openLegal;
+byId('legal-back').onclick = () => menu(legalReturn);
 
 byId('confirm-no').onclick = () => menu('home');
 byId('confirm-yes').onclick = () => {
@@ -1510,10 +1525,11 @@ window.addEventListener('keydown', (event) => {
       byId('record-confirm-no').click();
       return;
     }
-    if (!['settings', 'pause', 'setup', 'confirm', 'records', 'cover', 'file-help', 'install-help', 'done', 'home'].includes(view)) return;
+    if (!['settings', 'pause', 'setup', 'confirm', 'records', 'cover', 'file-help', 'install-help', 'done', 'home', 'legal'].includes(view)) return;
     event.preventDefault();
     if (event.repeat) return;
-    if (view === 'settings') closeSettings();
+    if (view === 'legal') menu(legalReturn);
+    else if (view === 'settings') closeSettings();
     else if (view === 'pause') resume();
     else if (view === 'home' || view === 'cover') return;
     else home();
