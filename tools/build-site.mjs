@@ -3,9 +3,10 @@
 // Игровые данные и dev-инструменты в артефакт не попадают.
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve(new URL('..', import.meta.url).pathname);
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const outIndex = process.argv.indexOf('--output');
 const out = resolve(outIndex > 0 ? process.argv[outIndex + 1] : join(root, '_site'));
 

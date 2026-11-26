@@ -140,6 +140,9 @@ export class Engine {
       onAudioSample: (left, right) => this.#onAudioSample(left, right),
     });
     this.console = console;
+    // Композитор работает с полным кадром 256×240: отключаем «телевизионный»
+    // кроп, как это делал старый порт.
+    console.ppu.clipToTvSize = false;
     this.mix.attach(console);
     this.nes = this.#createFacade();
     this.loaded = true;
@@ -223,6 +226,7 @@ export class Engine {
     this.clearButtons();
     this.audio.clear();
     this.console.reset();
+    this.console.ppu.clipToTvSize = false;
     this.mix.attach(this.console);
     this.totalFrames = 0;
     this.lastTime = null;

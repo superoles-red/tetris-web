@@ -360,14 +360,21 @@ class BlockCompiler {
         const base = this.operand16;
         const useX = this.mode === ABSX;
         if (base < 0x1f01) {
+          // Адрес гарантированно в RAM, но штраф за пересечение страницы
+          // всё равно нужен (fast-path не отменяет page-cross цикл).
+          this.storeCrossFlag(() => {
+            c.constI32(base & 0xff);
+            useX ? this.pushX() : this.pushY();
+            c.add();
+            c.constI32(0xff);
+            c.gtU();
+          });
           c.constI32(base);
           useX ? this.pushX() : this.pushY();
           c.add();
           c.constI32(0x7ff);
           c.and();
           c.load8u();
-          c.constI32(0);
-          c.localSet(LCROSS);
           return;
         }
         c.constI32(base);
@@ -532,7 +539,9 @@ class BlockCompiler {
       c.store8();
       return;
     }
-    if (mode === ZP || mode === ZPX || mode === ZPY || mode === INDX || mode === INDY) {
+    // Только прямо адресуемая zero page гарантированно в RAM. Косвенные
+    // режимы ((zp,X), (zp),Y) могут указывать на PPU/APU/маппер — через шину.
+    if (mode === ZP || mode === ZPX || mode === ZPY) {
       c.localGet(LA);
       c.constI32(0x7ff);
       c.and();
@@ -619,9 +628,10 @@ class BlockCompiler {
     this.setNZValueInLV();
   }
 
-  /** ADC/SBC: LV = M на входе. */
+  /** ADC/SBC: значение операнда приходит на стек. */
   addWithCarry(sbc) {
     const c = this.c;
+    c.localSet(LV);
     if (sbc) {
       c.localGet(LV);
       c.constI32(0xff);
@@ -863,22 +873,9 @@ class BlockCompiler {
     c.shl();
     c.or();
     c.localSet(LP);
-    // Чтение целевого адреса с тем же багом.
+    // Настоящий 6502: JMP (ind) использует прочитанное значение как адрес
+    // перехода напрямую (никакой второй косвенности).
     c.localGet(LP);
-    c.call(this.readIndex);
-    c.localGet(LP);
-    c.constI32(0xff00);
-    c.and();
-    c.localGet(LP);
-    c.constI32(1);
-    c.add();
-    c.constI32(0xff);
-    c.and();
-    c.or();
-    c.call(this.readIndex);
-    c.constI32(8);
-    c.shl();
-    c.or();
     c.localSet(LV);
     this.retDynamic(5);
   }
@@ -985,7 +982,7 @@ class BlockCompiler {
       c.store8();
       return;
     }
-    if (mode === ZP || mode === ZPX || mode === ZPY || mode === INDX || mode === INDY) {
+    if (mode === ZP || mode === ZPX || mode === ZPY) {
       c.localGet(LA);
       c.constI32(0x7ff);
       c.and();
@@ -1258,3 +1255,18 @@ export function compileRom(romInfo, { onProgress } = {}) {
 }
 
 export const OPCODE_TABLE = OPCODES;
+
+/** Размер инструкции в байтах для каждого кода (для тайминга шины). */
+export const OPCODE_SIZE = (() => {
+  const sizes = new Uint8Array(256);
+  for (let opcode = 0; opcode < 256; opcode++) {
+    const info = OPCODES[opcode];
+    if (!info) { sizes[opcode] = 2; continue; }
+    switch (info.mode) {
+      case IMP: case ACC: sizes[opcode] = 1; break;
+      case IMM: case ZP: case ZPX: case ZPY: case INDX: case INDY: case REL: sizes[opcode] = 2; break;
+      default: sizes[opcode] = 3;
+    }
+  }
+  return sizes;
+})();

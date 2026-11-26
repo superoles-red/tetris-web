@@ -2,7 +2,7 @@
 // Связывает скомпилированный WASM-код игры с моделями PPU/APU и маппером.
 
 import { createMapper } from './mapper.js';
-import { compileRom } from './compile.js';
+import { compileRom, OPCODE_SIZE } from './compile.js';
 import { parseRom } from './rom.js';
 import {
   CPU_A, CPU_P, CPU_SP, CPU_STATE, CPU_X, CPU_Y,
@@ -32,6 +32,11 @@ export class Console {
     this.romInfo = romInfo;
     this.mirroring = romInfo.mirroring;
     this.sampleRate = options.sampleRate ?? 48000;
+    /** Сколько PPU-точек продвигать до инструкции (эмуляция внутриинструкционных
+     *  обращений к шине, как у эталона). Остаток — после инструкции. */
+    this.ppuLead = options.ppuLead ?? 0;
+    /** Циклы «сброса» (эталон тратит 7 циклов на reset-последовательность). */
+    this.resetCycles = options.resetCycles ?? 0;
     this.ppu = options.ppu ?? null;
     this.apu = options.apu ?? null;
     this.mapper = createMapper(romInfo, {
@@ -42,6 +47,9 @@ export class Console {
     this.strobe = 0;
     this.buttonShift = [0, 0];
     this.dmaCycles = 0;
+    this.nmiLatch = false;
+    /** PPU-точки, уже продвинутые внутри текущей инструкции (для тайминга шины). */
+    this.busExtraDots = 0;
     this.cycles = 0;
     this.frameCount = 0;
     this.pc = 0;
@@ -97,7 +105,15 @@ export class Console {
   readBus(address) {
     address &= 0xffff;
     if (address < 0x2000) return this.view[address & 0x7ff];
-    if (address < 0x4000) return this.ppu.readReg(address & 0x7);
+    if (address < 0x4000) {
+      //Как у эталона: чтение регистра PPU видит точки, прошедшие за шинные
+      // циклы выборки/операндов этой инструкции. Остаток досчитываем в конце.
+      const size = OPCODE_SIZE[this.view[this.pc]] ?? 2;
+      const dots = size * 3;
+      this.ppu.advanceDots(dots);
+      this.busExtraDots += dots;
+      return this.ppu.readReg(address & 0x7);
+    }
     if (address < 0x4018) return this.#readIo(address);
     if (address < 0x6000) return 0; // открытая шина/расширение
     if (address < 0x8000) return this.wram ? this.wram[address - 0x6000] : 0;
@@ -113,6 +129,10 @@ export class Console {
       return;
     }
     if (address < 0x4000) {
+      const size = OPCODE_SIZE[this.view[this.pc]] ?? 2;
+      const dots = size * 3;
+      this.ppu.advanceDots(dots);
+      this.busExtraDots += dots;
       this.ppu.writeReg(address & 0x7, value);
       return;
     }
@@ -217,24 +237,37 @@ export class Console {
       this.view[base + 0x0a] = 0xdf;
       this.view[base + 0x0f] = 0xbf;
     }
-    this.wram = this.romInfo.battery ? new Uint8Array(0x2000) : null;
+    // Картриджи на этой платформе часто используют $6000-$7FFF как ОЗУ даже
+    // без батарейки (Tengen Tetris именно так и делает). JSNES тоже держит
+    // это окно записываемым, поэтому даём 8 КиБ WRAM всегда.
+    this.wram = new Uint8Array(0x2000);
+    // Сначала сбрасываем PPU/APU (PPU может чистить VRAM), затем маппер —
+    // его reset публикует окна PRG/CHR, иначе графика теряется при старте.
+    this.ppu.reset?.();
+    this.ppu.setMirroring?.(this.romInfo.mirroring);
+    this.apu.reset?.();
     this.mapper.reset();
     this.view[CPU_A] = 0;
     this.view[CPU_X] = 0;
     this.view[CPU_Y] = 0;
-    this.view[CPU_SP] = 0xfd;
+    this.view[CPU_SP] = 0xff;
     this.view[CPU_P] = FLAG_U | FLAG_I;
     this.cycles = 0;
     this.frameCount = 0;
     this.dmaCycles = 0;
+    this.nmiLatch = false;
+    /** PPU-точки, уже продвинутые внутри текущей инструкции (для тайминга шины). */
+    this.busExtraDots = 0;
     this.pc = this.resetVector;
+    if (this.resetCycles > 0) {
+      this.cycles = this.resetCycles;
+      this.ppu.advanceDots(this.resetCycles * 3);
+      this.apu.advance(this.resetCycles);
+    }
     this.buttons[0].fill(0);
     this.buttons[1].fill(0);
     this.buttonShift[0] = 0;
     this.buttonShift[1] = 0;
-    this.ppu.reset?.(this.romInfo.mirroring);
-    this.ppu.setMirroring?.(this.romInfo.mirroring);
-    this.apu.reset?.();
   }
 
   /** Одна инструкция 6502 (для отладки и дифференциальных тестов). */
@@ -274,11 +307,14 @@ export class Console {
       if (++guard > maxInstructions) {
         throw new ConsoleError('hang', 'Игра не доходит до конца кадра: возможно, зависла или зависла музыка.');
       }
+      if (this.ppuLead > 0) this.ppu.advanceDots(this.ppuLead);
       const result = this.instance.exports.step(this.pc);
       this.pc = result & 0xffff;
       const cycles = (result >>> 16) & 0xff;
       this.cycles += cycles;
-      this.ppu.advanceDots(cycles * 3);
+      const remainingDots = Math.max(0, cycles * 3 - this.busExtraDots);
+      this.busExtraDots = 0;
+      this.ppu.advanceDots(remainingDots);
       this.apu.advance(cycles);
       if (this.dmaCycles) {
         this.ppu.advanceDots(this.dmaCycles * 3);
@@ -286,10 +322,16 @@ export class Console {
         this.cycles += this.dmaCycles;
         this.dmaCycles = 0;
       }
-      if (this.ppu.nmiPending && !(this.view[CPU_P] & FLAG_I)) {
+      // NMI — фронтальное и немаскируемое: ловим «поднятие» сигнала и держим
+      // до ближайшей границы инструкции. Чтение $2002 не должно терять NMI.
+      if (this.ppu.nmiPending) {
         this.ppu.nmiPending = false;
+        this.nmiLatch = true;
+      }
+      if (this.nmiLatch) {
+        this.nmiLatch = false;
         this.#takeInterrupt(VECTOR_NMI, 7);
-      } else if (this.apu.irqPending && !(this.view[CPU_P] & FLAG_I)) {
+      } else if (this.apu?.irqPending && !(this.view[CPU_P] & FLAG_I)) {
         this.apu.acknowledgeIrq?.();
         this.#takeInterrupt(VECTOR_IRQ, 7);
       }
