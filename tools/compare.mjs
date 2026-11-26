@@ -471,6 +471,8 @@ async function main() {
 
   const referenceRam = [];
   const oursRam = [];
+  let referenceSamples = null;
+  let ourSamples = null;
 
   try {
     let reference = null;
@@ -492,6 +494,7 @@ async function main() {
           referenceRam[frame - 1] = Uint8Array.from(nes.cpu.mem.subarray(0, 0x800));
         },
       });
+      referenceSamples = reference.audio?.samples ?? null;
       report.reference = {
         engine: reference.engine,
         engineVersion: reference.engineVersion,
@@ -527,6 +530,7 @@ async function main() {
         collectRamSnapshots: engineMode === 'both',
       });
       ours = oursRun.result;
+      ourSamples = ours.audio?.samples ?? null;
       for (const snapshot of oursRun.ramSnapshots ?? []) oursRam.push(snapshot);
       report.ours = {
         engine: ours.engine,
@@ -548,10 +552,15 @@ async function main() {
     }
 
     if (engineMode === 'both') {
+      // Сэмплы нужны для аудио-диффа, но в JSON-отчёт не попадают (большой объём).
+      if (referenceSamples) report.reference.audio.samples = referenceSamples;
+      if (ourSamples) report.ours.audio.samples = ourSamples;
       const comparison = compareRuns(report.reference, report.ours, {
         referenceRam,
         oursRam,
       });
+      if (report.reference.audio) delete report.reference.audio.samples;
+      if (report.ours.audio) delete report.ours.audio.samples;
       report.comparison = comparison;
       if (!quiet) {
         if (report.chrReferenceCaveat) console.error(`ℹ ${report.chrReferenceCaveat}`);

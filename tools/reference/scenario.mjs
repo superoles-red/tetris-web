@@ -91,7 +91,10 @@ function requireFrame(value, where) {
 export function normalizeScenario(input) {
   if (input === undefined || input === null || input === '') return [];
   let events = input;
-  if (typeof input === 'string') events = parseScenarioText(input);
+  if (typeof input === 'string') {
+    // Имя готового пресета ('gameplay') или DSL ('start@100+4').
+    events = input in SCENARIOS ? SCENARIOS[input] : parseScenarioText(input);
+  }
   if (events && !Array.isArray(events) && Array.isArray(events.events)) events = events.events;
   if (!Array.isArray(events)) throw new Error('Сценарий ввода: ожидался массив событий или строка DSL.');
 

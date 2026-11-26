@@ -430,6 +430,17 @@ test('APU: frame IRQ выставляется в 4-step, запрещается 
   assert.equal(apu.irqPending, false);
 });
 
+test('APU: acknowledgeIrq снимает флаг frame IRQ после обслуживания', () => {
+  const apu = new APU();
+  apu.writeReg(0x4017, 0x00);
+  apu.advance(29828);
+  assert.equal(apu.irqPending, true);
+  apu.acknowledgeIrq();
+  assert.equal(apu.irqPending, false);
+  assert.equal(apu.frameIrqFlag, false);
+  assert.equal(apu.readReg(0x4015) & 0x40, 0);
+});
+
 test('APU: статус $4015 отражает length counter каналов', () => {
   const apu = new APU();
   assert.equal(apu.readReg(0x4015), 0);

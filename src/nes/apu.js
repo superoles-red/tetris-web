@@ -274,7 +274,8 @@ class TriangleChannel {
     this.enabled = false;
     this.control = false; // $4008 bit7: управление linear counter / length halt
     this.reloadValue = 0;
-    this.linearReload = false;
+    // JSNES при инициализации пишет $400B=0, что выставляет флаг перезагрузки.
+    this.linearReload = true;
     this.linearCounter = 0;
     this.timerPeriod = 0;
     this.timerWait = 0;
@@ -564,6 +565,16 @@ export class APU {
   setFrameRate() {
     // Фасад для совместимости с JSNES: у нас аудио привязано к тактам CPU,
     // а не к кадрам, поэтому пересчёт sample timer не нужен.
+  }
+
+  /**
+   * Подтвердить обслуживание IRQ (вызывается шиной/консолью после входа
+   * CPU в обработчик прерывания). Снимает выставленный APU флаг frame IRQ.
+   */
+  acknowledgeIrq() {
+    this.frameIrqFlag = false;
+    this.dmc.irqFlag = false; // DMC STUB: флаг всегда 0
+    this.#updateIrq();
   }
 
   /**
