@@ -1,0 +1,11 @@
+node_modules/
+*.nes
+*.NES
+*.zip
+_site/
+.DS_Store
+tools/.cache/
+tests/fixtures/roms/
+*.ppm
+*.wav
+*.png.tmp

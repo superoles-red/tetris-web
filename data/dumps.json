@@ -1,0 +1,31 @@
+{
+  "updated": "2026-11-26",
+  "note": "Только имена, SHA-256 и метаданные. ROM-файлов здесь нет и быть не должно.",
+  "dumps": [
+    {
+      "sha256": "53970a2b25819f9514bb7f32a7b568a3f4bdbd8754da9e7b9142020f1ab8ea62",
+      "name": "Tetris (USA) (Tengen) (Unl)",
+      "region": "USA",
+      "language": "en",
+      "mapper": 148,
+      "prg": 32768,
+      "chr": 16384,
+      "mirroring": "vertical",
+      "full": true,
+      "features": ["solo-start", "records", "saves", "hud-layout"]
+    },
+    {
+      "sha256": "33f04ac3953e7d6d3dd88083cd6f90ffddc805683d20fa8407d8c2d835b11d46",
+      "name": "Tetris (U) (Unl) [T+Rus1.11 PSCD (10.11.2015)]",
+      "region": "USA",
+      "language": "ru",
+      "mapper": 148,
+      "prg": 32768,
+      "chr": 16384,
+      "mirroring": "vertical",
+      "full": true,
+      "features": ["solo-start", "records", "saves", "hud-layout-ru"],
+      "note": "Русский перевод приносит игрок. Мы не поставляем и не распространяем его."
+    }
+  ]
+}

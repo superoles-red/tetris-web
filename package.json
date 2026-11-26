@@ -1,0 +1,17 @@
+{
+  "name": "tetris-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tengen Tetris in the browser: player-supplied NES ROM statically recompiled to WebAssembly",
+  "license": "MIT",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "node --test tests/",
+    "compare": "node tools/compare.mjs",
+    "site": "node tools/build-site.mjs"
+  },
+  "devDependencies": {
+    "jsnes": "2.1.0"
+  }
+}
