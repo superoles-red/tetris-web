@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Tengen Tetris · bring your own ROM",
+  "short_name": "Tetris",
+  "description": "Tetris (Tengen, NES) in the browser: the game code from your own ROM is recompiled to WebAssembly locally. We ship no game data.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070a",
+  "theme_color": "#070c13",
+  "categories": ["games"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icons/maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
