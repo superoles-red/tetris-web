@@ -1,6 +1,6 @@
 // Service worker оболочки BYOP. Кэширует ТОЛЬКО наш код и наши ассеты.
 // ROM игрока в service worker не попадает: он живёт в IndexedDB.
-// Версию подставляет tools/build-site.mjs вместо __BUILD_VERSION__.
+// Версию подставляет tools/build-site.mjs при сборке сайта.
 const BUILD = '__BUILD_VERSION__';
 const CACHE_PREFIX = 'tetris-web-shell:';
 const CACHE = CACHE_PREFIX + BUILD;

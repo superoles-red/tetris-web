@@ -24,6 +24,8 @@ jobs:
         run: npm test
       - name: CPU conformance ROM (fetched, not committed)
         run: node tools/fetch-cpu-test.mjs && node tests/cpu-conformance.mjs
+      - name: CPU differential vs JSNES (synthetic ROM, no game data)
+        run: node tests/cpu-differential.mjs
       - name: Build static site (no game data allowed)
         run: node tools/build-site.mjs --output "$RUNNER_TEMP/site"
       - name: Assert site artifact has no ROM/archives
