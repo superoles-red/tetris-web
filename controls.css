@@ -111,8 +111,9 @@
     height: var(--key-height);
     right: calc(var(--edge) + (var(--portrait-info-width) - 2 * var(--edge) - var(--key-height)) / 2);
   }
+  .pad { --pause-size: clamp(50px, 13.5vw, 62px); }
   .pad .utility {
-    top: calc(var(--ui-safe-top, 0px) * -1 + 8px);
+    top: 6px;
     right: calc(var(--device-safe-right, 0px) + var(--edge));
   }
 }
@@ -124,8 +125,8 @@
   .pad > .down {
     top: auto;
     bottom: calc(var(--key-height) + var(--edge) + 6px);
-    width: clamp(84px, 13%, 112px);
-    height: clamp(64px, 24vh, 110px);
+    width: clamp(72px, 11%, 96px);
+    height: clamp(56px, 20vh, 96px);
   }
   #game {
     --portrait-drop-width: clamp(56px, 13vw, 86px);

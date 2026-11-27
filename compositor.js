@@ -94,8 +94,11 @@ export class Compositor {
     this.landscape = window.matchMedia('(orientation: landscape)').matches;
     if (!this.landscape) {
       const style = getComputedStyle(this.game);
+      const padStyle = getComputedStyle(document.querySelector('.pad') ?? this.game);
       this.infoWidth = parseFloat(style.getPropertyValue('--portrait-info-width')) || 120;
-      this.pauseSize = parseFloat(style.getPropertyValue('--pause-size')) || 46;
+      // размер паузы задан на .pad — читаем оттуда, иначе не учитываем его в раскладке
+      this.pauseSize = parseFloat(padStyle.getPropertyValue('--pause-size'))
+        || parseFloat(style.getPropertyValue('--pause-size')) || 46;
       this.dropWidth = parseFloat(style.getPropertyValue('--portrait-drop-width')) || this.infoWidth;
       this.dropTop = (parseFloat(style.getPropertyValue('--portrait-drop-top')) || 45) / 100;
       this.dropHeight = parseFloat(style.getPropertyValue('--portrait-drop-height')) || 120;
@@ -181,7 +184,19 @@ export class Compositor {
         }
         spawnCtx.putImageData(spawnImage, 0, 0);
       }
-      this.preview = this.inkBounds(80, 240, 32, 24);
+      if (this.shared) {
+        // В общем колодце два окна NEXT — берём оба прямо из кадра.
+        this.preview = this.inkBounds(16, 24, 32, 28);
+        this.preview2 = this.inkBounds(208, 24, 32, 28);
+      } else {
+        this.preview = this.inkBounds(80, 240, 32, 24);
+        if (this.opponent) {
+          copyPiece(ppu, pixels, 12, 208, 24, 112, 240, 32, 24);
+          this.preview2 = this.inkBounds(112, 240, 32, 24);
+        } else {
+          this.preview2 = null;
+        }
+      }
       this.graph = this.graphBox(buffer);
       if (scene === 'dance') {
         const ram = nes.cpu.mem;
@@ -232,13 +247,14 @@ export class Compositor {
     this.blit(rect, cx - rect[2] * size / 2, y, rect[2] * size, rect[3] * size);
   }
 
-  metric(key, cx, y, width, scale, previewHeight = Infinity) {
+  metric(key, cx, y, width, scale, previewHeight = Infinity, previewOverride = null) {
     const label = this.labels[key];
     const small = Math.min(scale, width / label[2]);
     this.fit(label, cx, y, small);
     const top = y + 8 * small + 4 * scale;
+    const preview = previewOverride ?? this.preview;
     if (key === 'next') {
-      if (this.preview) this.fit(this.preview, cx, top, Math.min(scale * 1.4, previewHeight / this.preview[3]), width);
+      if (preview) this.fit(preview, cx, top, Math.min(scale * 1.4, previewHeight / preview[3]), width);
     } else {
       this.fit(numberBox(this.nes.ppu, key), cx, top, scale * 1.4, width);
     }
@@ -282,7 +298,7 @@ export class Compositor {
   sharedWell(left, top, k) {
     const border = 8 * k;
     const width = 96 * k + border * 2;
-    const height = 200 * k + border * 2;
+    const height = 184 * k + border * 2;
     const x = round(left), y = round(top);
     this.wellRect = [x, y, round(width), round(height)];
     this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
@@ -431,7 +447,7 @@ export class Compositor {
   sideHUD(x, top, width, height, keys, framed = false) {
     if (this.scene === 'dance') keys = keys.filter(key => key !== 'next');
     const cx = x + width / 2;
-    const slots = keys.map(key => key === 'next' || key === 'stats' ? 38 : 25);
+    const slots = keys.map(key => key === 'next' || key === 'next2' || key === 'stats' ? 38 : 25);
     const slotTotal = slots.reduce((a, b) => a + b, 0);
     const gaps = keys.length - 1;
     const scale = Math.min(width / 50, height / (slotTotal + 6 * gaps), 2);
@@ -442,6 +458,7 @@ export class Compositor {
     keys.forEach((key, i) => {
       const slot = slots[i] * scale;
       if (key === 'stats') this.stats(cx, y, width, slot, scale);
+      else if (key === 'next2') this.metric('next', cx, y, width, scale, slot - 12 * scale, this.preview2);
       else this.metric(key, cx, y, width, scale, slot - 12 * scale);
       y += slot + gap;
     });
@@ -497,9 +514,9 @@ export class Compositor {
     const fieldBottom = h - this.controlsHeight;
     // Верхняя линия: под кнопкой паузы. Колодец и информация начинаются
     // с одной линии, пауза — выше.
-    const topLine = pad + (this.pauseSize || 46) + pad;
+    const topLine = pad + (this.pauseSize || 46) + pad + 8;
     if (this.shared) {
-      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 216);
+      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 200);
       this.sharedWell((fieldW - 112 * k) / 2, topLine, k);
     } else {
       const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - topLine - pad) / WELL_H);
@@ -530,6 +547,10 @@ export class Compositor {
       y += (8 + 8 * 1.4) * scale + gap;
     };
     next();
+    if ((this.opponent || this.shared) && this.preview2) {
+      this.metric('next', centerX, y, colW, scale, 40, this.preview2);
+      y += 8 * scale + 40 * scale * 1.4 + gap;
+    }
     metric('score');
     metric('lines');
     if (!this.shared) metric('level');
@@ -551,7 +572,7 @@ export class Compositor {
       const gap = Math.min(38, Math.max(10, left * .09));
       const side = Math.max(20, Math.min(180, left - gap - pad));
       const top = Math.min(38, Math.max(9, h * .05));
-      const bottom = Math.min(h - 112, h * .68);
+      const bottom = Math.min(h - 96, h * .72);
       this.sideHUD(left - gap - side, top, side, Math.max(48, bottom - top), ['score', 'lines'], true);
       const rightX = left + fieldW + gap;
       const rightW = Math.max(20, Math.min(side, w - PAUSE_CORNER - rightX));
@@ -569,7 +590,7 @@ export class Compositor {
     const rightW = clearRight >= 66 ? Math.min(side, clearRight) : side;
     const y = Math.min(38, Math.max(9, h * .05));
     const rightY = clearRight < 66 ? Math.max(PAUSE_CORNER + 2, y) : y;
-    const bottom = Math.min(h - 112, h * .68);
+    const bottom = Math.min(h - 96, h * .72);
     const nearDrop = rightX + rightW > w * .87 - 18;
     const rightBottom = nearDrop && this.scene !== 'dance' ? Math.min(bottom, h * .60 - 18) : bottom;
     const leftX = left - gap - side;
@@ -577,16 +598,16 @@ export class Compositor {
     const rightHeight = Math.max(48, rightBottom - rightY);
     if (this.opponent) {
       // Слева — информация, справа — колодец компьютера (по возможности крупный).
-      this.sideHUD(leftX, y, side, leftHeight, ['next', 'score', 'lines', 'level'], true);
+      this.sideHUD(leftX, y, side, leftHeight, ['next', 'next2', 'score', 'lines', 'level'], true);
       // Колодец врага — сразу справа от колодца игрока, по размеру как
       // левая информационная панель (а не у края экрана).
       const enemyAreaX = rightX;
-      const enemyAreaW = Math.max(60, Math.min(side, w - rightX - PAUSE_CORNER - 8));
-      const enemyAreaH = Math.max(120, rightHeight);
+      const enemyAreaW = Math.max(60, Math.min(side * 1.12, w - rightX - PAUSE_CORNER - 6));
+      const enemyAreaH = Math.max(120, leftHeight);
       const unit = Math.min(enemyAreaW / WELL_W, enemyAreaH / WELL_H);
       const mw = WELL_W * unit, mh = WELL_H * unit;
       if (mw > 24 && mh > 48) {
-        this.miniWell(enemyAreaX + (enemyAreaW - mw) / 2, rightY + (enemyAreaH - mh) / 2, unit, Math.max(4, round(3 * pad)));
+        this.miniWell(enemyAreaX + (enemyAreaW - mw) / 2, y + (enemyAreaH - mh) / 2, unit, Math.max(4, round(3 * pad)));
       }
     } else {
       this.sideHUD(leftX, y, side, leftHeight, ['score', 'lines', 'level'], true);
