@@ -189,13 +189,9 @@ export class Compositor {
         this.preview = this.inkBounds(16, 24, 32, 28);
         this.preview2 = this.inkBounds(208, 24, 32, 28);
       } else {
+        // В обычном и VS режимах показываем только следующую фигуру игрока.
         this.preview = this.inkBounds(80, 240, 32, 24);
-        if (this.opponent) {
-          copyPiece(ppu, pixels, 12, 208, 24, 112, 240, 32, 24);
-          this.preview2 = this.inkBounds(112, 240, 32, 24);
-        } else {
-          this.preview2 = null;
-        }
+        this.preview2 = null;
       }
       this.graph = this.graphBox(buffer);
       if (scene === 'dance') {
@@ -576,7 +572,7 @@ export class Compositor {
       y += (8 + 8 * 1.4) * scale + gap;
     };
     next();
-    if ((this.opponent || this.shared) && this.preview2) {
+    if (this.shared && this.preview2) {
       this.metric('next', centerX, y, colW, scale, 40, this.preview2, true);
       y += 8 * scale + 40 * scale * 1.4 + gap;
     }
@@ -605,7 +601,7 @@ export class Compositor {
       this.sideHUD(left - gap - side, top, side, Math.max(48, bottom - top), ['score', 'lines'], true);
       const rightX = left + fieldW + gap;
       const rightW = Math.max(20, Math.min(side, w - PAUSE_CORNER - rightX));
-      this.sideHUD(rightX, top, rightW, Math.max(48, bottom - top), ['next'], true);
+      this.sideHUD(rightX, top, rightW, Math.max(48, bottom - top), ['next', 'next2'], true);
       return;
     }
     const k = Math.min((h - 2 * pad) / WELL_H, (w - 2 * (58 + pad)) / WELL_W);
@@ -627,7 +623,7 @@ export class Compositor {
     const rightHeight = Math.max(48, rightBottom - rightY);
     if (this.opponent) {
       // Слева — информация, справа — колодец компьютера (по возможности крупный).
-      this.sideHUD(leftX, y, side, leftHeight, ['next', 'next2', 'score', 'lines', 'level'], true);
+      this.sideHUD(leftX, y, side, leftHeight, ['next', 'score', 'lines', 'level'], true);
       // Колодец врага — сразу справа от колодца игрока, по размеру как
       // левая информационная панель (а не у края экрана).
       const enemyAreaX = rightX;

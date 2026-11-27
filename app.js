@@ -973,6 +973,11 @@ function enterGameScreen() {
   overlay.hidden = true;
   overlay.classList.remove('in-game');
   renderer.resize();
+  // iOS может ещё раз поменять размер после скрытия меню/выезда панелей:
+  // пересчитываем размер канвы на следующем кадре, иначе картинка растягивается.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (view === 'game') renderer.resize();
+  }));
   schedulePadMetrics();
   if (engine && engineState === 'ready') {
     engine.wakeAudio();
@@ -1938,6 +1943,10 @@ async function boot() {
   }
   if (rom) void loadEngine();
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && view === 'game') renderer.resize();
+});
 
 // Начальный экран нужен сразу, даже пока IndexedDB открывается.
 try {

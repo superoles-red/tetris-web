@@ -11,7 +11,7 @@
 const PIXEL = 128;
 const UNITS = 1024;
 
-import { BUILTIN_GLYPHS, BUILTIN_PUNCTUATION } from './pixel-font.js';
+import { BUILTIN_GLYPHS, BUILTIN_LATIN, BUILTIN_PUNCTUATION } from './pixel-font.js';
 
 const LATIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
@@ -246,20 +246,25 @@ export function buildTtf(glyphs, family = 'TengenCart', { advance = UNITS } = {}
 export function glyphsFromRom(chr, language = 'en') {
   const glyphs = new Map();
   glyphs.set(' ', new Uint8Array(9));
+  const bank = chr.subarray(0, 8192);
   if (language === 'ru') {
-    // Буквы и цифры — наш шрифт (одинаковые во всех языках).
-    for (const [ch, rows] of BUILTIN_GLYPHS) glyphs.set(ch, rowsFromStrings(rows));
+    // Буквы — наш шрифт (кириллица + латиница), чтобы любые имена в рекордах
+    // рисовались в стиле игры, а не системным шрифтом.
+    for (const [ch, rows] of BUILTIN_GLYPHS) {
+      if (/[0-9]/.test(ch)) continue;
+      glyphs.set(ch, rowsFromStrings(rows));
+    }
+    for (const [ch, rows] of BUILTIN_LATIN) glyphs.set(ch, rowsFromStrings(rows));
   } else {
-    const bank = chr.subarray(0, 8192);
-    // Буквы — из английского картриджа; цифры — из встроенного шрифта,
-    // чтобы во всех языках были одинаковые.
+    // Английские буквы — из картриджа.
     for (const ch of LATIN) {
       if (/[0-9]/.test(ch)) continue;
       glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
     }
-    for (const [ch, rows] of BUILTIN_GLYPHS) {
-      if (/[0-9]/.test(ch)) glyphs.set(ch, rowsFromStrings(rows));
-    }
+  }
+  // Цифры — оригинальные из ROM (одинаковые для обоих языков интерфейса).
+  for (const ch of '0123456789') {
+    glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
   }
   for (const [ch, rows] of BUILTIN_PUNCTUATION) glyphs.set(ch, rowsFromStrings(rows));
   return glyphs;

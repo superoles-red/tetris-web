@@ -140,6 +140,9 @@ function buildCyrillic() {
 export const BUILTIN_GLYPHS = new Map();
 for (const [ch, body] of Object.entries({ ...DIGITS, ...buildCyrillic() })) BUILTIN_GLYPHS.set(ch, body);
 
-/** Знаки препинания в том же стиле (9 строк). */
+/** Английские буквы нашего рисунка (для русского интерфейса тоже). */
+export const BUILTIN_LATIN = new Map();
+for (const [ch, rows] of Object.entries(LATIN)) BUILTIN_LATIN.set(ch, glyphBody(rows));
+
 export const BUILTIN_PUNCTUATION = new Map();
 for (const [ch, rows] of Object.entries(PUNCTUATION)) BUILTIN_PUNCTUATION.set(ch, [...rows, '........']);
