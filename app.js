@@ -24,6 +24,7 @@ import {
 import { saveMenuCheckpoint, restoreMenuCheckpoint } from './src/byop/menu-checkpoint.js';
 import { frameToDataUrl, isUsableCoverFrame, coverDataUrlIsUsable } from './src/byop/cover.js';
 import { applyGameSkin } from './src/byop/game-skin.js';
+import { extractNesFromZip, looksLikeZip } from './src/byop/zip.js';
 
 bindPhoneInsets();
 
@@ -119,9 +120,6 @@ let skinApplied = false;
 let titleFrame = null;
 let playFrame = null;
 let titleArtUrl = null;
-let titleAnim = null;
-let titleAnimTimer = 0;
-let titleImageData = null;
 const owner = runId();
 const heldInputs = new Map();
 const refreshChoices = [];
@@ -150,50 +148,72 @@ function updateSplash() {
 // Страховка: сплэш не должен залипнуть ни при какой ошибке.
 setTimeout(hideSplash, 8000);
 
-// --- живая анимация титульного экрана (рамка + салюты, как в оригинале) ---
+// --- титульная анимация: записанный цикл кадров (без нагрузки на CPU) ---
+// Живьём крутить картридж нельзя: сбивается палитра (купола синеют) и
+// тормозит музыка. Записываем один правильный цикл и проигрываем его.
+const TITLE_LOOP_FRAMES = 72;
+let titleLoop = null;   // Uint32Array[] кадров
+let titleLoopRaf = 0;
+
+function captureTitleLoop() {
+  if (mode !== MODE_FULL || !engine || engineState !== 'ready') return;
+  titleLoop = null;
+  const frames = [];
+  try {
+    for (let i = 0; i < TITLE_LOOP_FRAMES; i++) {
+      engine.nes.frame();
+      frames.push(new Uint32Array(engine.nes.ppu.buffer));
+    }
+  } catch (error) { console.warn('title loop capture failed', error); titleLoop = null; return; }
+  titleLoop = frames;
+  console.log('title loop frames', frames.length);
+}
+
 function startTitleAnimation() {
-  if (view !== 'home' || mode !== MODE_FULL || engineState !== 'ready' || !engine || !rom) return;
-  if (titleAnim) return;
+  if (view !== 'home' || mode !== MODE_FULL || engineState !== 'ready' || !rom) return;
   const canvas = byId('art-canvas');
   if (!canvas) return;
-  const image = byId('art-image');
+  if (titleLoopRaf) return;
+  if (!titleLoop) captureTitleLoop();
   canvas.hidden = false;
+  byId('art').hidden = false;
+  const image = byId('art-image');
   if (image) image.hidden = true;
   canvas.width = 256;
   canvas.height = 240;
   const ctx = canvas.getContext('2d', { alpha: false });
   ctx.imageSmoothingEnabled = false;
-  if (!titleImageData) titleImageData = ctx.createImageData(256, 240);
-  const pixels = new Uint32Array(titleImageData.data.buffer);
+  let imageData = null;
+  let pixels = null;
+  let index = 0;
+  let last = 0;
   const draw = () => {
-    const buffer = engine.nes.ppu.buffer;
-    for (let i = 0; i < 256 * 240; i++) {
-      const v = buffer[i] >>> 0;
-      pixels[i] = 0xff000000 | ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
+    const frame = titleLoop?.[index];
+    index = (index + 1) % (titleLoop?.length || 1);
+    if (!frame) {
+      console.warn('title frame missing');
+      canvas.hidden = true;
+      if (image && titleArtUrl) image.hidden = false;
+      return;
     }
-    ctx.putImageData(titleImageData, 0, 0);
+    if (!imageData) { imageData = ctx.createImageData(256, 240); pixels = new Uint32Array(imageData.data.buffer); }
+    // Формат кадра PPU уже совпадает с ImageData (как в compositor.draw):
+    // не переставляем каналы, иначе красное/золотое становится синим.
+    for (let i = 0; i < 256 * 240; i++) pixels[i] = 0xff000000 | frame[i];
+    ctx.putImageData(imageData, 0, 0);
   };
   const loop = (time) => {
-    if (view !== 'home') { titleAnim = null; return; }
-    if (time - (loop.last ?? 0) > 33) {
-      loop.last = time;
-      try { engine.nes.frame(); } catch { /* картридж спит */ }
-      draw();
-      // Возвращаем титульный экран, чтобы салют/анимация рамки повторялись.
-      if (menuBase && time - (loop.resetAt ?? 0) > 7000) {
-        loop.resetAt = time;
-        try { engine.restoreStart(menuBase); } catch { /* не критично */ }
-      }
-    }
-    titleAnim = requestAnimationFrame(loop);
+    if (view !== 'home') { titleLoopRaf = 0; return; }
+    if (time - last >= 50) { last = time; draw(); }
+    titleLoopRaf = requestAnimationFrame(loop);
   };
   draw();
-  titleAnim = requestAnimationFrame(loop);
+  titleLoopRaf = requestAnimationFrame(loop);
 }
 
 function stopTitleAnimation() {
-  if (titleAnim) cancelAnimationFrame(titleAnim);
-  titleAnim = null;
+  if (titleLoopRaf) cancelAnimationFrame(titleLoopRaf);
+  titleLoopRaf = 0;
   const canvas = byId('art-canvas');
   if (canvas) canvas.hidden = true;
   const image = byId('art-image');
@@ -461,7 +481,7 @@ function applyArtVisibility() {
   const show = animated || (view === 'home' ? Boolean(titleArtUrl) : view === 'cover');
   byId('art').hidden = !show;
   if (animated) {
-    byId('art-canvas').hidden = !titleAnim;
+    byId('art-canvas').hidden = !titleLoopRaf;
     if (titleArtUrl) byId('art-image').hidden = true;
   }
 }
@@ -629,12 +649,14 @@ async function loadEngine() {
     else prepareCompatibleMode();
     loaded = true;
     engineState = 'ready';
+    captureTitleLoop();
     captureTitleFrame();
     void refreshSkin();
     renderCard();
     renderHome();
     if (view === 'cover') menu('home');
     else if (view === 'home') startTitleAnimation();
+    hideSplash();
     syncMenuMusic();
   } catch (error) {
     engineFailed(error);
@@ -1238,6 +1260,35 @@ function showRomError(result) {
   renderCard();
 }
 
+function pickZipEntry(entries) {
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.id = 'zip-picker';
+    const box = document.createElement('div');
+    box.className = 'zip-picker-box';
+    const title = document.createElement('p');
+    title.className = 'zip-picker-title';
+    title.textContent = t.chooseRom ?? 'ВЫБЕРИТЕ ROM';
+    box.append(title);
+    for (const entry of entries) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'action';
+      button.textContent = entry.name;
+      button.onclick = () => { wrap.remove(); resolve(entry); };
+      box.append(button);
+    }
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'action';
+    cancel.textContent = t.back;
+    cancel.onclick = () => { wrap.remove(); resolve(null); };
+    box.append(cancel);
+    wrap.append(box);
+    document.body.append(wrap);
+  });
+}
+
 async function importRomFile(file) {
   if (!file) return;
   clearRomError();
@@ -1256,10 +1307,29 @@ async function importRomFile(file) {
       showRomError({ ok: false, code: 'read', detail: error?.message ?? '' });
       return;
     }
+    let fileName = file.name;
+    let fileSize = file.size;
+    if (looksLikeZip(bytes)) {
+      setCardStatus(t.romReading);
+      let entries = [];
+      try { entries = await extractNesFromZip(bytes); } catch (error) {
+        showRomError({ ok: false, code: 'type', detail: error?.message ?? '' });
+        return;
+      }
+      if (entries.length === 0) {
+        showRomError({ ok: false, code: 'type', detail: 'В ZIP нет файлов .nes' });
+        return;
+      }
+      const chosen = entries.length === 1 ? entries[0] : await pickZipEntry(entries);
+      if (!chosen) { setCardStatus(null); return; }
+      bytes = chosen.bytes;
+      fileName = chosen.name;
+      fileSize = bytes.length;
+    }
     setCardStatus(t.romChecking);
     let catalog = null;
     try { catalog = await loadDumpCatalog(); } catch { catalog = null; }
-    const result = await inspectRomFile({ fileName: file.name, bytes, catalog });
+    const result = await inspectRomFile({ fileName, bytes, catalog });
     if (!result.ok) {
       showRomError(result);
       return;
@@ -1270,8 +1340,8 @@ async function importRomFile(file) {
       try {
         await store.saveRom({
           sha: result.sha256,
-          name: file.name,
-          size: file.size,
+          name: fileName,
+          size: fileSize,
           profile: result.passport,
           bytes
         });
@@ -1291,8 +1361,8 @@ async function importRomFile(file) {
 
     rom = {
       sha: result.sha256,
-      name: file.name,
-      size: file.size,
+      name: fileName,
+      size: fileSize,
       bytes,
       profile: result.passport
     };
@@ -1432,8 +1502,15 @@ byId('record-confirm-yes').onclick = () => {
 // --- подтверждения ---------------------------------------------------------
 function renderSavedMenu() {
   const change = confirmIntent === 'change-rom';
-  byId('confirm-title').textContent = change ? t.changeRomPrompt
-    : confirmIntent === 'replace' ? t.replacePrompt : t.resumePrompt;
+  const titles = {
+    'change-rom': t.changeRomPrompt,
+    replace: t.replacePrompt,
+    'new-game': t.replacePrompt,
+    restart: t.restartPrompt,
+    menu: t.menuPrompt,
+    continue: t.resumePrompt
+  };
+  byId('confirm-title').textContent = titles[confirmIntent] ?? t.resumePrompt;
   const note = change ? t.changeRomNote : confirmIntent === 'replace' ? t.replaceNote : '';
   byId('confirm-note').textContent = note;
   byId('confirm-note').hidden = !note;
@@ -1563,10 +1640,15 @@ byId('home-legal').onclick = openLegal;
 byId('pause-legal').onclick = openLegal;
 byId('legal-back').onclick = () => menu(legalReturn);
 
-byId('confirm-no').onclick = () => menu('home');
+byId('confirm-no').onclick = () => {
+  if (confirmIntent === 'restart' || confirmIntent === 'menu') menu('pause');
+  else menu('home');
+};
 byId('confirm-yes').onclick = () => {
   if (confirmIntent === 'change-rom') { beginChangeRom(); return; }
-  if (confirmIntent === 'replace') { menu('setup'); return; }
+  if (confirmIntent === 'replace' || confirmIntent === 'new-game') { menu('setup'); return; }
+  if (confirmIntent === 'restart') { restart(); return; }
+  if (confirmIntent === 'menu') { home(); return; }
   void continueSavedRun();
 };
 
@@ -1574,8 +1656,7 @@ byId('play').onclick = () => {
   if (!rom || engineState !== 'ready') return;
   unlockMenuMusic();
   if (mode === MODE_FULL) {
-    if (savedInfo) confirmRun('replace');
-    else menu('setup');
+    confirmRun(savedInfo ? 'replace' : 'new-game');
   } else {
     playAsIs();
   }
@@ -1585,8 +1666,8 @@ byId('records').onclick = () => { recordsAfterGame = false; menu('records'); };
 byId('setup-back').onclick = home;
 byId('start').onclick = () => { void beginFull(); };
 byId('resume').onclick = resume;
-byId('restart').onclick = restart;
-byId('main-menu').onclick = home;
+byId('restart').onclick = () => confirmRun('restart');
+byId('main-menu').onclick = () => confirmRun('menu');
 afterGame.onclick = byId('records-replay').onclick = () => {
   releaseAll();
   engine?.setPaused(true);
@@ -1801,7 +1882,7 @@ async function boot() {
 
   renderAll();
   updateSplash();
-  hideSplash();
+  if (!rom) hideSplash();
   if (!rom) {
     menu('cover');
   } else if (!installResolved()) {

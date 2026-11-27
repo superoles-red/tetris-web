@@ -282,7 +282,7 @@ export class Compositor {
   sharedWell(left, top, k) {
     const border = 8 * k;
     const width = 96 * k + border * 2;
-    const height = 160 * k + border * 2;
+    const height = 200 * k + border * 2;
     const x = round(left), y = round(top);
     this.wellRect = [x, y, round(width), round(height)];
     this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
@@ -499,8 +499,8 @@ export class Compositor {
     // с одной линии, пауза — выше.
     const topLine = pad + (this.pauseSize || 46) + pad;
     if (this.shared) {
-      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 200);
-      this.sharedWell((fieldW - 112 * k) / 2, topLine + 40 * k, k);
+      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 216);
+      this.sharedWell((fieldW - 112 * k) / 2, topLine, k);
     } else {
       const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - topLine - pad) / WELL_H);
       this.well((fieldW - WELL_W * k) / 2, topLine, k);
@@ -578,13 +578,15 @@ export class Compositor {
     if (this.opponent) {
       // Слева — информация, справа — колодец компьютера (по возможности крупный).
       this.sideHUD(leftX, y, side, leftHeight, ['next', 'score', 'lines', 'level'], true);
+      // Колодец врага — сразу справа от колодца игрока, по размеру как
+      // левая информационная панель (а не у края экрана).
       const enemyAreaX = rightX;
-      const enemyAreaW = Math.max(40, w - rightX - 14);
-      const enemyAreaH = Math.max(120, h - 200);
+      const enemyAreaW = Math.max(60, Math.min(side, w - rightX - PAUSE_CORNER - 8));
+      const enemyAreaH = Math.max(120, rightHeight);
       const unit = Math.min(enemyAreaW / WELL_W, enemyAreaH / WELL_H);
       const mw = WELL_W * unit, mh = WELL_H * unit;
       if (mw > 24 && mh > 48) {
-        this.miniWell(enemyAreaX + (enemyAreaW - mw) / 2, Math.max(6, (h - mh) / 2), unit, Math.max(4, round(3 * pad)));
+        this.miniWell(enemyAreaX + (enemyAreaW - mw) / 2, rightY + (enemyAreaH - mh) / 2, unit, Math.max(4, round(3 * pad)));
       }
     } else {
       this.sideHUD(leftX, y, side, leftHeight, ['score', 'lines', 'level'], true);
