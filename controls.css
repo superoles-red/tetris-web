@@ -113,7 +113,7 @@
   }
   .pad { --pause-size: clamp(50px, 13.5vw, 62px); }
   .pad .utility {
-    top: 6px;
+    top: 14px;
     right: calc(var(--device-safe-right, 0px) + var(--edge));
   }
 }

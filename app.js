@@ -150,24 +150,38 @@ function updateSplash() {
 setTimeout(hideSplash, 8000);
 
 // --- титульная анимация: записанный цикл кадров (без нагрузки на CPU) ---
-// Живьём крутить картридж нельзя: сбивается палитра (купола синеют) и
-// тормозит музыка. Записываем один правильный цикл и проигрываем его.
-const TITLE_LOOP_FRAMES = 120;
-let titleLoop = null;   // Uint32Array[] кадров
+// Картридж рисует разные салюты в разных местах; записываем ~10 секунд
+// анимации в виде индексов палитры (иначе память раздувается).
+const TITLE_CAPTURE_FRAMES = 600; // кадров картриджа (~10 c)
+const TITLE_CAPTURE_STEP = 2;     // сохраняем каждый второй кадр
+let titleLoop = null;   // { palette: Uint32Array, frames: Uint8Array[] }
 let titleLoopRaf = 0;
 
 function captureTitleLoop() {
   if (mode !== MODE_FULL || !engine || engineState !== 'ready') return;
   titleLoop = null;
+  const palette = [];
+  const lookup = new Map();
   const frames = [];
   try {
-    for (let i = 0; i < TITLE_LOOP_FRAMES; i++) {
+    for (let i = 0; i < TITLE_CAPTURE_FRAMES; i++) {
       engine.nes.frame();
-      frames.push(new Uint32Array(engine.nes.ppu.buffer));
+      if (i % TITLE_CAPTURE_STEP !== 0) continue;
+      const buffer = engine.nes.ppu.buffer;
+      const index = new Uint8Array(256 * 240);
+      for (let j = 0; j < index.length; j++) {
+        const color = buffer[j] >>> 0;
+        let value = lookup.get(color);
+        if (value === undefined) {
+          if (palette.length >= 256) { value = 0; lookup.set(color, 0); }
+          else { value = palette.length; palette.push(color); lookup.set(color, value); }
+        }
+        index[j] = value;
+      }
+      frames.push(index);
     }
-  } catch (error) { console.warn('title loop capture failed', error); titleLoop = null; return; }
-  titleLoop = frames;
-  console.log('title loop frames', frames.length);
+  } catch { titleLoop = null; return; }
+  titleLoop = { palette: Uint32Array.from(palette), frames };
 }
 
 function startTitleAnimation() {
@@ -180,11 +194,7 @@ function startTitleAnimation() {
   byId('art').hidden = false;
   const image = byId('art-image');
   if (image) image.hidden = true;
-  // Кадр титульного экрана: убираем 8 px чёрного поля слева (рамка
-  // начинается с x=8), иначе внутри панели видна чёрная полоса.
-  const CROP_X = 8;
-  const CROP_W = 256 - CROP_X;
-  canvas.width = CROP_W;
+  canvas.width = 256;
   canvas.height = 240;
   const ctx = canvas.getContext('2d', { alpha: false });
   ctx.imageSmoothingEnabled = false;
@@ -193,24 +203,26 @@ function startTitleAnimation() {
   let index = 0;
   let last = 0;
   const draw = () => {
-    const frame = titleLoop?.[index];
-    index = (index + 1) % (titleLoop?.length || 1);
-    if (!frame) {
-      canvas.hidden = true;
-      if (image && titleArtUrl) image.hidden = false;
-      return;
-    }
-    if (!imageData) { imageData = ctx.createImageData(CROP_W, 240); pixels = new Uint32Array(imageData.data.buffer); }
-    // Формат кадра PPU уже совпадает с ImageData (как в compositor.draw):
-    // не переставляем каналы, иначе красное/золотое становится синим.
+    if (!titleLoop) return;
+    const frame = titleLoop.frames[index];
+    index = (index + 1) % titleLoop.frames.length;
+    if (!frame) return;
+    if (!imageData) { imageData = ctx.createImageData(256, 240); pixels = new Uint32Array(imageData.data.buffer); }
+    const palette = titleLoop.palette;
     for (let y = 0; y < 240; y++) {
-      for (let x = 0; x < CROP_W; x++) pixels[y * CROP_W + x] = 0xff000000 | frame[y * 256 + x + CROP_X];
+      const row = y * 256;
+      for (let x = 0; x < 256; x++) {
+        // Левая внешняя рамка на титуле уже правой (начинается с x=8).
+        // Дорисовываем нормальный квадрат слева, как справа.
+        const sx = x < 8 ? 8 + (x % 8) : x;
+        pixels[row + x] = 0xff000000 | palette[frame[row + sx]];
+      }
     }
     ctx.putImageData(imageData, 0, 0);
   };
   const loop = (time) => {
     if (view !== 'home') { titleLoopRaf = 0; return; }
-    if (time - last >= 40) { last = time; draw(); }
+    if (time - last >= 33) { last = time; draw(); }
     titleLoopRaf = requestAnimationFrame(loop);
   };
   draw();
@@ -1421,10 +1433,13 @@ function fitRecordNames() {
     const name = slot.firstElementChild;
     if (!name) continue;
     name.style.fontSize = '';
+    const slotWidth = slot.getBoundingClientRect().width
+      || slot.parentElement?.clientWidth || 0;
     const width = name.getBoundingClientRect().width;
-    if (width > slot.clientWidth && width > 0) {
-      const size = parseFloat(getComputedStyle(name).fontSize);
-      name.style.fontSize = (size * slot.clientWidth / width) + 'px';
+    // Никогда не уменьшаем до нуля: имя должно быть видно всегда.
+    if (slotWidth > 8 && width > slotWidth) {
+      const size = parseFloat(getComputedStyle(name).fontSize) || 13;
+      name.style.fontSize = Math.max(9, size * slotWidth / width) + 'px';
     }
   }
 }

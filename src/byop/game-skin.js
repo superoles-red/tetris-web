@@ -12,33 +12,41 @@ const ARROW_TILE = 62; // стрелка меню игры (plane 0 CHR)
 
 /** Золотая клетчатая рамка титульного экрана (как в оригинале). */
 export function buildOrnamentFrameUrl(titleBuffer) {
-  // 9-slice рамка как на титульном экране: внешние тёплые клетки + синий узор.
+  // Симметричная рамка как на титульном экране: одна и та же кромка
+  // (тёплые клетки снаружи + синий узор внутри) поворачивается на 90°.
   if (!titleBuffer || titleBuffer.length < 256 * 240) return null;
-  const slice = 24;
-  const canvas = makeCanvas(slice * 2 + 16, slice * 2 + 16);
+  const size = 32;
+  const canvas = makeCanvas(size * 3, size * 3);
   if (!canvas) return null;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.imageSmoothingEnabled = false;
-  const put = (sx, sy, dx, dy) => {
-    const img = ctx.createImageData(slice, slice);
-    const px = new Uint32Array(img.data.buffer);
-    for (let y = 0; y < slice; y++) for (let x = 0; x < slice; x++) {
-      const v = titleBuffer[(sy + y) * 256 + sx + x];
-      px[y * slice + x] = 0xff000000 | v;
-    }
-    ctx.putImageData(img, dx, dy);
+  const source = makeCanvas(256, 240);
+  if (!source) return null;
+  const sourceCtx = source.getContext('2d');
+  const imageData = sourceCtx.createImageData(256, 240);
+  const pixels = new Uint32Array(imageData.data.buffer);
+  for (let i = 0; i < 256 * 240; i++) pixels[i] = 0xff000000 | titleBuffer[i];
+  sourceCtx.putImageData(imageData, 0, 0);
+  const piece = (sx, sy, dx, dy, angle) => {
+    ctx.save();
+    ctx.translate(dx + size / 2, dy + size / 2);
+    ctx.rotate(angle);
+    ctx.drawImage(source, sx, sy, size, size, -size / 2, -size / 2, size, size);
+    ctx.restore();
   };
-  const size = canvas.width;
-  put(8, 0, 0, 0);
-  put(232, 0, size - slice, 0);
-  put(8, 216, 0, size - slice);
-  put(232, 216, size - slice, size - slice);
-  put(112, 0, slice, 0);
-  put(112, 216, slice, size - slice);
-  put(8, 112, 0, slice);
-  put(232, 112, size - slice, slice);
+  const edgeX = 112, edgeY = 0;
+  const cornerX = 224, cornerY = 0;
+  const half = Math.PI / 2;
+  piece(cornerX, cornerY, 0, 0, -half);        // левый верхний
+  piece(cornerX, cornerY, size * 2, 0, 0);     // правый верхний
+  piece(cornerX, cornerY, size * 2, size * 2, half);  // правый нижний
+  piece(cornerX, cornerY, 0, size * 2, Math.PI);      // левый нижний
+  piece(edgeX, edgeY, size, 0, 0);             // верхняя кромка
+  piece(edgeX, edgeY, size * 2, size, half);   // правая
+  piece(edgeX, edgeY, size, size * 2, Math.PI);// нижняя
+  piece(edgeX, edgeY, 0, size, -half);         // левая
   return toDataUrl(canvas);
 }
 
