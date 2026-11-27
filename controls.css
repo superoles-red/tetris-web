@@ -2,9 +2,9 @@
 
 .pad {
   --edge: clamp(8px, 2.6vw, 14px);
-  --key-height: clamp(48px, 13.2vw, 62px);
+  --key-height: clamp(54px, 14.4vw, 68px);
   --gap: clamp(7px, 2vw, 12px);
-  --mark-size: clamp(20px, 6.2vw, 30px);
+  --mark-size: clamp(22px, 6.6vw, 32px);
   --pause-size: clamp(40px, 11vw, 50px);
   --cap-fill: rgb(6 16 26 / 72%);
   --cap-border: 3px solid var(--sky);
@@ -27,7 +27,7 @@
 }
 
 /* Нажимаемая «плитка» — рамка в стиле игровых панелей. */
-.pad .moves .key::after, .pad .turns .key::after, .pad > .down::after {
+.pad .moves .key::after, .pad > .down::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
   border: var(--cap-border); background: var(--cap-fill);
   box-shadow: inset 0 0 0 1px #0000b4, 0 2px 0 rgb(0 0 0 / 70%);
@@ -60,6 +60,20 @@
 }
 .pad .turn.ccw .mark.rotate { transform: scaleX(-1); }
 
+/* Поворот: визуально одна широкая кнопка с двумя половинами. */
+.pad .turns { position: absolute; }
+.pad .turns::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  border: var(--cap-border); background: var(--cap-fill);
+  box-shadow: inset 0 0 0 1px #0000b4, 0 2px 0 rgb(0 0 0 / 70%);
+}
+.pad .turns .key + .key::before {
+  content: ''; position: absolute; left: 0; top: 18%; height: 64%; width: 2px;
+  background: var(--sky); opacity: .55; pointer-events: none;
+}
+.pad .turns .key:is(.held, :active) { background: rgb(247 180 0 / 12%); }
+.pad .turns .key:is(.held, :active) .mark.rotate { background: var(--gold); }
+
 /* Кнопка паузы */
 .pad .utility {
   position: absolute; top: var(--edge); right: var(--edge);
@@ -84,14 +98,16 @@
 
 @media (orientation: portrait) {
   #game {
-    --portrait-drop-width: clamp(72px, 20vw, 96px);
+    --portrait-info-width: clamp(104px, 29vw, 136px);
+    --portrait-drop-width: var(--portrait-info-width);
     --portrait-drop-top: 48%;
-    --portrait-drop-height: clamp(92px, 19vh, 148px);
-    --portrait-controls-height: clamp(78px, 21vw, 94px);
+    --portrait-drop-height: clamp(64px, 9.5vh, 92px);
+    --portrait-controls-height: clamp(80px, 21vw, 96px);
   }
   .pad > .down {
-    top: var(--portrait-drop-top);
-    width: clamp(54px, 15vw, 76px);
+    top: auto;
+    bottom: calc(var(--key-height) + var(--edge) + 10px);
+    width: calc(var(--portrait-info-width) - 2 * var(--edge));
     height: var(--portrait-drop-height);
   }
 }
