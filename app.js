@@ -490,6 +490,7 @@ function menu(name, { focus = true } = {}) {
   if (!Object.hasOwn(VIEW_ELEMENTS, name)) throw new Error('Unknown view ' + name);
   view = name;
   const inGame = name === 'pause' || (name === 'settings' && settingsReturn === 'pause');
+  overlay.classList.remove('starting');
   overlay.dataset.menu = name;
   overlay.hidden = false;
   overlay.classList.toggle('in-game', inGame);
