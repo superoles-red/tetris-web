@@ -279,7 +279,14 @@ export async function applyGameSkin(options = {}) {
   // Кириллица чуть шире английских глифов: даём ей 9 px на знак,
   // чтобы буквы не слипались и читались так же легко.
   const advance = language === 'ru' ? 1152 : 1024;
-  const font = options.chr ? await installGameFont(options.chr, language, family, { advance }) : null;
+  // Кириллица — наш встроенный шрифт (не зависит от ROM). Английский берём
+  // из английского картриджа; на русском ROM английских глифов нет, поэтому
+  // для ENG-интерфейса оставляем системный шрифт.
+  const romLanguage = options.romLanguage ?? language;
+  const canBuildFont = language === 'ru' || romLanguage === 'en';
+  const font = options.chr && canBuildFont
+    ? await installGameFont(options.chr, language, family, { advance })
+    : null;
   assets.font = font;
   if (!root) return { applied: false, font, assets };
   if (font) root.style.setProperty(SKIN_VARS.font, `"${font}", "Courier New", monospace`);
