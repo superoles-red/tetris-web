@@ -18,10 +18,15 @@
   <link rel="stylesheet" href="install.css">
 </head>
 <body>
+  <div id="splash" role="status" aria-live="polite">
+    <b id="splash-title">TETRIS</b>
+    <span id="splash-note">ЗАГРУЗКА…</span>
+  </div>
   <main id="machine" aria-label="Tengen Tetris">
     <section id="game" aria-label="Game" hidden data-scene="boot">
       <div id="screen"><canvas id="picture" aria-label="Tetris playfield and statistics"></canvas></div>
       <button class="action primary" id="game-over-next" type="button" data-i18n="showResults" hidden></button>
+      <button id="fast-forward" class="action" type="button" hidden></button>
       <div id="result-bar" hidden>
         <button id="after-game" class="action primary" type="button" data-i18n="playAgain" hidden></button>
       </div>
@@ -43,6 +48,7 @@
       <div id="panel" class="panel cover">
         <button id="home-settings" type="button" aria-label="" title=""></button>
         <picture id="art">
+          <canvas id="art-canvas" aria-hidden="true" hidden></canvas>
           <img id="art-image" alt="" draggable="false" hidden>
           <span id="art-placeholder" aria-hidden="true">
             <i class="cover-cell c1"></i><i class="cover-cell c2"></i><i class="cover-cell c3"></i><i class="cover-cell c4"></i>

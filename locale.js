@@ -117,6 +117,8 @@ export const translations = {
 
     // Main menu
     homeStatusLoading: 'Loading the game…',
+    loading: 'LOADING…',
+    fastForward: 'SPEED UP PC',
     homeNewGame: 'NEW GAME',
     homePlayAsIs: 'PLAY',
     homeContinue: 'CONTINUE',
@@ -323,6 +325,10 @@ export const translations = {
 
     // Main menu
     homeStatusLoading: 'Загрузка игры…',
+    loading: 'LOADING…',
+    fastForward: 'SPEED UP PC',
+    loading: 'ЗАГРУЗКА…',
+    fastForward: 'УСКОРИТЬ ПК',
     homeNewGame: 'НОВАЯ ИГРА',
     homePlayAsIs: 'ИГРАТЬ',
     homeContinue: 'ПРОДОЛЖИТЬ',
