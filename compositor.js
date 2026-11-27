@@ -78,6 +78,8 @@ export class Compositor {
     this.pixels = new Uint32Array(this.image.data.buffer);
     this.frameImage = null;
     this.frameReady = false;
+    this.opponent = false;
+    this.shared = false;
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(canvas);
     this.resize();
@@ -141,6 +143,20 @@ export class Compositor {
       }
       copyPiece(ppu, pixels, 0, 16, 48, 0, 240, 80, 16);
       copyPiece(ppu, pixels, 8, 16, 24, 80, 240, 32, 24);
+      if (this.opponent) {
+        for (let row = 0; row < 2; row++) {
+          for (let col = 0; col < 10; col++) {
+            const tile = ppu.vramMem[0x2000 + (row + 6) * 32 + col + 20];
+            if (tile === 0 || tile > 15) continue;
+            for (let line = 0; line < 8; line++) {
+              const from = (48 + row * 8 + line) * 256 + 160 + col * 8;
+              const to = (240 + row * 8 + line) * 256 + 160 + col * 8;
+              for (let j = 0; j < 8; j++) pixels[to + j] = BLACK | buffer[from + j];
+            }
+          }
+        }
+        copyPiece(ppu, pixels, 4, 160, 48, 160, 240, 80, 16);
+      }
       this.preview = this.inkBounds(80, 240, 32, 24);
       this.graph = this.graphBox(buffer);
       if (scene === 'dance') {
@@ -230,6 +246,44 @@ export class Compositor {
     this.ctx.lineWidth = line;
     this.ctx.strokeRect(round(left) + line / 2, round(top) + line / 2,
       round(width) - line, round(height) - line);
+  }
+
+  /** Режим игры: 'solo', 'vs' (соперник) или 'with' (общий колодец). */
+  setGameMode(mode) {
+    this.opponent = mode === 'vs';
+    this.shared = mode === 'with';
+  }
+
+  /** Общий колодец режима WITH COMPUTER: 12×18 клеток, два игрока. */
+  sharedWell(left, top, k) {
+    const border = 8 * k;
+    const width = 96 * k + border * 2;
+    const height = 144 * k + border * 2;
+    const x = round(left), y = round(top);
+    this.wellRect = [x, y, round(width), round(height)];
+    this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
+    const innerX = x + Math.round(border), innerY = y + Math.round(border);
+    const innerW = round(width) - Math.round(border) * 2;
+    const innerH = round(height) - Math.round(border) * 2;
+    if (innerW > 1 && innerH > 1) this.blit([80, 80, 96, 144], innerX, innerY, innerW, innerH);
+  }
+
+  /** Маленький колодец компьютера: тот же кадр игры, но из правого колодца. */
+  miniWell(left, top, unit, borderPx) {
+    const x = round(left), y = round(top);
+    const width = WELL_W * unit, height = WELL_H * unit;
+    const previous = this.wellRect;
+    this.wellRect = [x, y, width, height];
+    this.frameRect(x, y, width, height, round(borderPx));
+    const border = round(borderPx);
+    const innerX = x + border, innerY = y + border;
+    const innerW = width - border * 2, innerH = height - border * 2;
+    if (innerW > 1 && innerH > 1) {
+      const spawnH = round(16 * unit);
+      this.blit([160, 240, 80, 16], innerX, innerY, innerW, spawnH);
+      this.blit([160, 64, 80, 160], innerX, innerY + spawnH, innerW, innerH - spawnH);
+    }
+    this.wellRect = previous;
   }
 
   // Игровая рамка (40×40, как frame.png): ею обводим колодец и панели HUD.
@@ -405,10 +459,14 @@ export class Compositor {
 
   portrait(w, h) {
     const pad = Math.min(7, Math.max(3, w * .012));
+    const opponent = this.opponent;
+    const railW = opponent ? Math.max(this.dropWidth, 112) : this.dropWidth;
     const headerWidth = Math.min(w - PAUSE_CORNER - pad, 624);
     const scale = Math.min(2.05, w / 260, h / 320);
-    const headers = this.scene === 'dance' ? [['score', .45], ['high', .55]] :
-      [['next', .24], ['score', .34], ['high', .42]];
+    const headers = this.scene === 'dance' ? [['score', .5], ['high', .5]] :
+      opponent ? [['next', .5], ['score', .5]] :
+        this.shared ? [['next', .5], ['score', .5]] :
+        [['next', .24], ['score', .34], ['high', .42]];
     const fieldTop = round(pad + 30 * scale + 6);
     this.hudPanel(2, 2, headerWidth + pad - 3, fieldTop - 4, Math.max(3, round(3 * scale)));
     let left = pad;
@@ -418,27 +476,59 @@ export class Compositor {
       left += slot;
     }
 
-    const fieldWidth = w - this.dropWidth;
+    const fieldWidth = w - railW;
     const fieldBottom = h - this.controlsHeight;
-    const k = Math.min((fieldWidth - 2 * pad) / WELL_W, (fieldBottom - fieldTop) / WELL_H);
-    this.well((fieldWidth - WELL_W * k) / 2, fieldTop, k);
+    if (this.shared) {
+      const k = Math.min((fieldWidth - 2 * pad) / 112, (fieldBottom - fieldTop) / 160);
+      this.sharedWell((fieldWidth - 112 * k) / 2, fieldTop + (fieldBottom - fieldTop - 160 * k) / 2, k);
+    } else {
+      const k = Math.min((fieldWidth - 2 * pad) / WELL_W, (fieldBottom - fieldTop) / WELL_H);
+      this.well((fieldWidth - WELL_W * k) / 2, fieldTop + (fieldBottom - fieldTop - WELL_H * k) / 2, k);
+    }
 
-    const railTop = Math.max(fieldTop, PAUSE_CORNER) + pad;
-    const railWidth = this.dropWidth - 2 * pad;
-    const railBottom = Math.max(railTop + 48, Math.min(
-      h * this.dropTop - this.dropHeight / 2 - pad, railTop + railWidth * 2.7));
-    const railHeight = railBottom - railTop;
-    const railCenter = w - this.dropWidth / 2;
-    this.hudPanel(railCenter - this.dropWidth / 2 + 2, railTop - 5, this.dropWidth - 4, railHeight + 10, Math.max(3, round(2.2 * scale)));
-    const railScale = Math.min(scale, railWidth / 50, railHeight / 105);
-    this.metric('lines', railCenter, railTop, railWidth, railScale);
-    this.metric('level', railCenter, railTop + 31 * railScale, railWidth, railScale);
-    const chartTop = railTop + 63 * railScale;
-    this.chart(railCenter, chartTop, railWidth, railBottom - chartTop, railScale * 1.3, true);
+    const railLeft = w - railW + pad;
+    const railWidth = railW - 2 * pad;
+    const railTop = fieldTop;
+    const railBottom = fieldBottom;
+    const railCenter = railLeft + railWidth / 2;
+    this.hudPanel(railLeft - pad + 2, railTop - 5, railWidth + pad * 2 - 4, railBottom - railTop + 10, Math.max(3, round(2.2 * scale)));
+    if (this.shared) {
+      // Общий колодец: показываем счётчик линий, без графика и уровня.
+      const metricScale = Math.min(scale, railWidth / 50);
+      this.metric('lines', railCenter, railTop + 4, railWidth, metricScale);
+    } else if (opponent) {
+      // Сверху — линии/уровень, снизу — маленький колодец компьютера.
+      const unit = Math.max(1, Math.floor(Math.min(railWidth / WELL_W, (railBottom - railTop - 120) / WELL_H)));
+      const mw = WELL_W * unit, mh = WELL_H * unit;
+      const metricScale = Math.min(scale, railWidth / 50);
+      this.metric('lines', railCenter, railTop + 4, railWidth, metricScale);
+      this.metric('level', railCenter, railTop + 34 * metricScale + 4, railWidth, metricScale);
+      this.miniWell(railCenter - mw / 2, railBottom - mh, unit, Math.max(4, round(4 * scale)));
+    } else {
+      const railScale = Math.min(scale, railWidth / 50, (railBottom - railTop) / 105);
+      this.metric('lines', railCenter, railTop, railWidth, railScale);
+      this.metric('level', railCenter, railTop + 31 * railScale, railWidth, railScale);
+      const chartTop = railTop + 63 * railScale;
+      this.chart(railCenter, chartTop, railWidth, railBottom - chartTop, railScale * 1.3, true);
+    }
   }
 
   landscapeGame(w, h) {
     const pad = Math.min(9, Math.max(3, h * .012));
+    if (this.shared) {
+      const k = Math.min((h - 2 * pad) / 160, (w - 2 * (58 + pad)) / 112);
+      const fieldW = 112 * k, left = (w - fieldW) / 2;
+      this.sharedWell(left, (h - 160 * k) / 2, k);
+      const gap = Math.min(38, Math.max(10, left * .09));
+      const side = Math.max(20, Math.min(180, left - gap - pad));
+      const top = Math.min(38, Math.max(9, h * .05));
+      const bottom = Math.min(h - 112, h * .68);
+      this.sideHUD(left - gap - side, top, side, Math.max(48, bottom - top), ['score', 'lines'], true);
+      const rightX = left + fieldW + gap;
+      const rightW = Math.max(20, Math.min(side, w - PAUSE_CORNER - rightX));
+      this.sideHUD(rightX, top, rightW, Math.max(48, bottom - top), ['next'], true);
+      return;
+    }
     const k = Math.min((h - 2 * pad) / WELL_H, (w - 2 * (58 + pad)) / WELL_W);
     const fieldW = WELL_W * k, left = (w - fieldW) / 2;
     this.well(left, (h - WELL_H * k) / 2, k);
@@ -456,8 +546,17 @@ export class Compositor {
     const leftX = left - gap - side;
     const leftHeight = Math.max(48, bottom - y);
     const rightHeight = Math.max(48, rightBottom - rightY);
-    this.sideHUD(leftX, y, side, leftHeight, ['score', 'lines', 'level'], true);
-    this.sideHUD(rightX, rightY, rightW, rightHeight, ['next', 'high', 'stats'], true);
+    if (this.opponent) {
+      const hudBottom = y + Math.min(leftHeight, 118);
+      this.sideHUD(leftX, y, side, hudBottom - y, ['score', 'lines'], true);
+      const unit = Math.max(1, Math.floor(Math.min(side / WELL_W, (h - 70 - hudBottom) / WELL_H)));
+      const mw = WELL_W * unit;
+      if (mw <= side) this.miniWell(leftX + (side - mw) / 2, h - 70 - WELL_H * unit, unit, Math.max(4, round(3 * pad)));
+      this.sideHUD(rightX, rightY, rightW, rightHeight, ['next', 'level', 'stats'], true);
+    } else {
+      this.sideHUD(leftX, y, side, leftHeight, ['score', 'lines', 'level'], true);
+      this.sideHUD(rightX, rightY, rightW, rightHeight, ['next', 'high', 'stats'], true);
+    }
   }
 
   paint() {

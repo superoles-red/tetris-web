@@ -77,11 +77,12 @@ function clampIndex(value, max, fallback) {
  * Вызывать раз в эмулированный кадр; `true` — картридж уже в игре.
  * Все выборы идут через контроллер 1: так нативный код сам инициализирует
  * RNG, сетку столкновений и счёт.
- * @param {{level?: number, handicap?: number, music?: number}} options
+ * @param {{level?: number, handicap?: number, music?: number, mode?: number}} options
+ *   mode — пункт меню игры: 0 «1 PLAYER», 3 «VERSUS COMPUTER».
  */
-export function createSoloStart({ level = 0, handicap = 0, music = 1 } = {}) {
+export function createSoloStart({ level = 0, handicap = 0, music = 1, mode = 0 } = {}) {
   const selections = {
-    mode: 0,
+    mode: clampIndex(mode, 4, 0),
     level: clampIndex(level, 9, 0),
     handicap: clampIndex(handicap / 3, 4, 0),
     music: clampIndex(music, 4, 1)
