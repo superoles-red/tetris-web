@@ -37,7 +37,7 @@ export function buildOrnamentFrameUrl(titleBuffer) {
   put(232, 216, size - slice, size - slice);
   put(112, 0, slice, 0);
   put(112, 216, slice, size - slice);
-  put(0, 112, 0, slice);
+  put(8, 112, 0, slice);
   put(232, 112, size - slice, slice);
   return toDataUrl(canvas);
 }

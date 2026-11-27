@@ -105,6 +105,7 @@ let observedEnd = false;
 let records = [];
 let savedInfo = null;
 let confirmIntent = null;
+let suppressMenuMusic = false;
 let runStore = null;
 let activeRun = null;
 let nextSaveAt = 0;
@@ -151,7 +152,7 @@ setTimeout(hideSplash, 8000);
 // --- титульная анимация: записанный цикл кадров (без нагрузки на CPU) ---
 // Живьём крутить картридж нельзя: сбивается палитра (купола синеют) и
 // тормозит музыка. Записываем один правильный цикл и проигрываем его.
-const TITLE_LOOP_FRAMES = 72;
+const TITLE_LOOP_FRAMES = 120;
 let titleLoop = null;   // Uint32Array[] кадров
 let titleLoopRaf = 0;
 
@@ -179,7 +180,11 @@ function startTitleAnimation() {
   byId('art').hidden = false;
   const image = byId('art-image');
   if (image) image.hidden = true;
-  canvas.width = 256;
+  // Кадр титульного экрана: убираем 8 px чёрного поля слева (рамка
+  // начинается с x=8), иначе внутри панели видна чёрная полоса.
+  const CROP_X = 8;
+  const CROP_W = 256 - CROP_X;
+  canvas.width = CROP_W;
   canvas.height = 240;
   const ctx = canvas.getContext('2d', { alpha: false });
   ctx.imageSmoothingEnabled = false;
@@ -191,20 +196,21 @@ function startTitleAnimation() {
     const frame = titleLoop?.[index];
     index = (index + 1) % (titleLoop?.length || 1);
     if (!frame) {
-      console.warn('title frame missing');
       canvas.hidden = true;
       if (image && titleArtUrl) image.hidden = false;
       return;
     }
-    if (!imageData) { imageData = ctx.createImageData(256, 240); pixels = new Uint32Array(imageData.data.buffer); }
+    if (!imageData) { imageData = ctx.createImageData(CROP_W, 240); pixels = new Uint32Array(imageData.data.buffer); }
     // Формат кадра PPU уже совпадает с ImageData (как в compositor.draw):
     // не переставляем каналы, иначе красное/золотое становится синим.
-    for (let i = 0; i < 256 * 240; i++) pixels[i] = 0xff000000 | frame[i];
+    for (let y = 0; y < 240; y++) {
+      for (let x = 0; x < CROP_W; x++) pixels[y * CROP_W + x] = 0xff000000 | frame[y * 256 + x + CROP_X];
+    }
     ctx.putImageData(imageData, 0, 0);
   };
   const loop = (time) => {
     if (view !== 'home') { titleLoopRaf = 0; return; }
-    if (time - last >= 50) { last = time; draw(); }
+    if (time - last >= 40) { last = time; draw(); }
     titleLoopRaf = requestAnimationFrame(loop);
   };
   draw();
@@ -539,6 +545,10 @@ function isFrontMenu() {
 
 function syncMenuMusic() {
   if (!engine || engineState !== 'ready') return;
+  if (suppressMenuMusic) {
+    engine.stopMenuMusic();
+    return;
+  }
   if (menuMusicUnlocked && !document.hidden && isFrontMenu() && settings.musicVolume > 0 && loaded) {
     engine.playMenuMusic(settings.musicVolume);
   }
@@ -1512,13 +1522,20 @@ function renderSavedMenu() {
     continue: t.resumePrompt
   };
   byId('confirm-title').textContent = titles[confirmIntent] ?? t.resumePrompt;
-  const note = change ? t.changeRomNote : confirmIntent === 'replace' ? t.replaceNote : '';
+  const notes = {
+    restart: t.restartNote,
+    menu: t.menuNote,
+    replace: t.replaceNote,
+    'new-game': t.replaceNote
+  };
+  const note = change ? t.changeRomNote : (notes[confirmIntent] ?? '');
   byId('confirm-note').textContent = note;
   byId('confirm-note').hidden = !note;
   byId('confirm-no').textContent = t.no;
   byId('confirm-yes').textContent = t.yes;
   const preview = document.querySelector('.saved-preview');
-  const showPreview = !change && Boolean(savedInfo);
+  // Картинку прошлой сессии показываем только при «Продолжить».
+  const showPreview = !change && confirmIntent === 'continue' && Boolean(savedInfo);
   preview.hidden = !showPreview;
   byId('confirm-no').classList.toggle('danger', change);
   byId('confirm-yes').classList.toggle('danger', change);
@@ -1532,9 +1549,18 @@ function renderSavedMenu() {
 }
 
 function confirmRun(intent) {
+  const fromPause = view === 'pause';
   confirmIntent = intent;
+  // Из паузы подтверждение должно быть беззвучным: музыка меню не включается.
+  suppressMenuMusic = fromPause;
   renderSavedMenu();
   menu('confirm');
+  if (fromPause) {
+    // Оставляем размытую игру под маленьким окном подтверждения.
+    overlay.classList.add('in-game');
+    game.hidden = false;
+    game.inert = true;
+  }
 }
 
 // Правовой экран: доступен с карточки, из меню, паузы и настроек.
@@ -1642,10 +1668,13 @@ byId('pause-legal').onclick = openLegal;
 byId('legal-back').onclick = () => menu(legalReturn);
 
 byId('confirm-no').onclick = () => {
-  if (confirmIntent === 'restart' || confirmIntent === 'menu') menu('pause');
+  const fromPause = confirmIntent === 'restart' || confirmIntent === 'menu';
+  suppressMenuMusic = false;
+  if (fromPause) menu('pause');
   else menu('home');
 };
 byId('confirm-yes').onclick = () => {
+  suppressMenuMusic = false;
   if (confirmIntent === 'change-rom') { beginChangeRom(); return; }
   if (confirmIntent === 'replace' || confirmIntent === 'new-game') { menu('setup'); return; }
   if (confirmIntent === 'restart') { restart(); return; }
@@ -1657,7 +1686,8 @@ byId('play').onclick = () => {
   if (!rom || engineState !== 'ready') return;
   unlockMenuMusic();
   if (mode === MODE_FULL) {
-    confirmRun(savedInfo ? 'replace' : 'new-game');
+    if (savedInfo) confirmRun('replace');
+    else menu('setup');
   } else {
     playAsIs();
   }
