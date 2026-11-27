@@ -51,7 +51,7 @@ img, canvas, .panel { image-rendering: pixelated; }
 
 #machine { position: relative; height: var(--phone-app-height, 100dvh); }
 #machine::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
   background: var(--bg-block) center top / 32px 32px repeat;
   image-rendering: pixelated; filter: grayscale(1); opacity: .095;
 }
