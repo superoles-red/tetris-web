@@ -427,7 +427,8 @@ function showNotice(message) {
   view = 'starting';
   overlay.dataset.menu = 'notice';
   overlay.hidden = false;
-  overlay.classList.remove('in-game');
+  overlay.classList.add('in-game');
+  overlay.classList.add('starting');
   game.hidden = true;
   game.inert = true;
   byId('panel').className = 'panel dialog';

@@ -12,31 +12,9 @@ const ARROW_TILE = 62; // стрелка меню игры (plane 0 CHR)
 
 /** Золотая клетчатая рамка титульного экрана (как в оригинале). */
 export function buildGoldFrameUrl(titleBuffer) {
-  if (!titleBuffer || titleBuffer.length < 256 * 240) return null;
-  const canvas = makeCanvas(48, 48);
-  if (!canvas) return null;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, 48, 48);
-  ctx.imageSmoothingEnabled = false;
-  const put = (sx, sy, dx, dy) => {
-    const img = ctx.createImageData(16, 16);
-    const px = new Uint32Array(img.data.buffer);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const v = titleBuffer[(sy + y) * 256 + sx + x];
-      px[y * 16 + x] = 0xff000000 | (v & 0xff) << 16 | (v & 0xff00) | ((v >>> 16) & 0xff);
-    }
-    ctx.putImageData(img, dx, dy);
-  };
-  put(0, 0, 0, 0);
-  put(240, 0, 32, 0);
-  put(0, 224, 0, 32);
-  put(240, 224, 32, 32);
-  put(112, 0, 16, 0);
-  put(112, 224, 16, 32);
-  put(0, 112, 0, 16);
-  put(240, 112, 32, 16);
-  return toDataUrl(canvas);
+  // Золотые разноцветные клетки из рамки титульного экрана: одна клетка
+  // повторяется по периметру панели (как block.png старого порта).
+  return cropBufferUrl(titleBuffer, [240, 0, 16, 16]);
 }
 const TITLE_CROP = [32, 32, 192, 176];
 const BLOCK_CROP = [240, 0, 16, 16];
@@ -308,7 +286,7 @@ export async function applyGameSkin(options = {}) {
   const family = `TengenTap-${language}-${Math.random().toString(36).slice(2, 8)}`;
   // Кириллица чуть шире английских глифов: даём ей 9 px на знак,
   // чтобы буквы не слипались и читались так же легко.
-  const advance = language === 'ru' ? 1152 : 1024;
+  const advance = 1024;
   // Кириллица — наш встроенный шрифт (не зависит от ROM). Английский берём
   // из английского картриджа; на русском ROM английских глифов нет, поэтому
   // для ENG-интерфейса оставляем системный шрифт.
