@@ -171,12 +171,12 @@ export class Compositor {
         if (!this.sharedSpawn) {
           this.sharedSpawn = document.createElement('canvas');
           this.sharedSpawn.width = 96;
-          this.sharedSpawn.height = 40;
+          this.sharedSpawn.height = 32;
         }
         const spawnCtx = this.sharedSpawn.getContext('2d');
-        const spawnImage = spawnCtx.createImageData(96, 40);
+        const spawnImage = spawnCtx.createImageData(96, 32);
         const spawnPixels = new Uint32Array(spawnImage.data.buffer);
-        for (let y = 0; y < 40; y++) {
+        for (let y = 0; y < 32; y++) {
           for (let x = 0; x < 96; x++) {
             const v = pixels[(272 + y) * SRC_WIDTH + x];
             spawnPixels[y * 96 + x] = (v & 0xffffff) ? (0xff000000 | (v & 0xffffff)) : 0;
@@ -247,10 +247,39 @@ export class Compositor {
     this.blit(rect, cx - rect[2] * size / 2, y, rect[2] * size, rect[3] * size);
   }
 
-  metric(key, cx, y, width, scale, previewHeight = Infinity, previewOverride = null) {
+  drawCpuLabel(cx, y, small, labelWidth) {
+    const glyphs = {
+      C: ['..###', '.#...', '#....', '#....', '#....', '.#...', '..###'],
+      P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+      U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.']
+    };
+    const ctx = this.ctx;
+    const unit = Math.max(1, (small * 8) / 7);
+    const width = 3 * 5 * unit + 2 * unit;
+    let x = cx + labelWidth / 2 + small;
+    if (x + width > this.width - 2) x = cx - labelWidth / 2 - width - small;
+    ctx.save();
+    ctx.fillStyle = '#bef2ff';
+    ctx.imageSmoothingEnabled = false;
+    let offset = 0;
+    for (const ch of 'CPU') {
+      const glyph = glyphs[ch];
+      for (let row = 0; row < 7; row++) {
+        for (let col = 0; col < 5; col++) {
+          if (glyph[row][col] !== '#') continue;
+          ctx.fillRect(Math.round(x + offset + col * unit), Math.round(y + 0.5 * small + row * unit), Math.ceil(unit), Math.ceil(unit));
+        }
+      }
+      offset += 5 * unit + unit;
+    }
+    ctx.restore();
+  }
+
+  metric(key, cx, y, width, scale, previewHeight = Infinity, previewOverride = null, cpu = false) {
     const label = this.labels[key];
     const small = Math.min(scale, width / label[2]);
     this.fit(label, cx, y, small);
+    if (cpu) this.drawCpuLabel(cx, y, small, label[2] * small);
     const top = y + 8 * small + 4 * scale;
     const preview = previewOverride ?? this.preview;
     if (key === 'next') {
@@ -298,7 +327,7 @@ export class Compositor {
   sharedWell(left, top, k) {
     const border = 8 * k;
     const width = 96 * k + border * 2;
-    const height = 184 * k + border * 2;
+    const height = 176 * k + border * 2;
     const x = round(left), y = round(top);
     this.wellRect = [x, y, round(width), round(height)];
     this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
@@ -458,7 +487,7 @@ export class Compositor {
     keys.forEach((key, i) => {
       const slot = slots[i] * scale;
       if (key === 'stats') this.stats(cx, y, width, slot, scale);
-      else if (key === 'next2') this.metric('next', cx, y, width, scale, slot - 12 * scale, this.preview2);
+      else if (key === 'next2') this.metric('next', cx, y, width, scale, slot - 12 * scale, this.preview2, true);
       else this.metric(key, cx, y, width, scale, slot - 12 * scale);
       y += slot + gap;
     });
@@ -516,7 +545,7 @@ export class Compositor {
     // с одной линии, пауза — выше.
     const topLine = pad + (this.pauseSize || 46) + pad + 8;
     if (this.shared) {
-      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 200);
+      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 192);
       this.sharedWell((fieldW - 112 * k) / 2, topLine, k);
     } else {
       const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - topLine - pad) / WELL_H);
@@ -548,7 +577,7 @@ export class Compositor {
     };
     next();
     if ((this.opponent || this.shared) && this.preview2) {
-      this.metric('next', centerX, y, colW, scale, 40, this.preview2);
+      this.metric('next', centerX, y, colW, scale, 40, this.preview2, true);
       y += 8 * scale + 40 * scale * 1.4 + gap;
     }
     metric('score');
