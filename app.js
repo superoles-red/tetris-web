@@ -68,6 +68,7 @@ const runId = () => globalThis.crypto?.randomUUID?.() ?? Date.now() + '-' + Math
 
 // --- состояние -------------------------------------------------------------
 const settings = {
+  opponent: 'solo',
   language: preferredLanguage(),
   level: 0,
   handicap: 0,
@@ -883,6 +884,7 @@ function enterRun(scene = 'play') {
   game.classList.remove('scores');
   activeScene = scene;
   game.dataset.scene = scene;
+  renderer.setGameMode?.(mode === MODE_FULL ? (settings.opponent ?? 'solo') : 'solo');
   applyMix();
   engine?.setMuted(false);
   resume();
@@ -913,7 +915,8 @@ async function beginFull() {
     const advance = createSoloStart({
       level: settings.level,
       handicap: settings.handicap,
-      music: engine.startMusic(settings.track)
+      music: engine.startMusic(settings.track),
+      mode: settings.opponent === 'vs' ? 3 : settings.opponent === 'with' ? 4 : 0
     });
     let frames = 0;
     let rankingSeeded = false;
@@ -1376,6 +1379,9 @@ function addChoice(containerId, key, values, read, change, format = String) {
 }
 
 function buildSettingsChoices() {
+  addChoice('setup-choices', 'opponent', ['solo', 'vs', 'with'], () => settings.opponent,
+    (value) => { settings.opponent = value; },
+    (value) => value === 'vs' ? t.opponentVs : value === 'with' ? t.opponentWith : t.opponentSolo);
   addChoice('setup-choices', 'level', SETUP_LEVELS, () => settings.level, (n) => { settings.level = n; });
   addChoice('setup-choices', 'rows', SETUP_HANDICAPS, () => settings.handicap, (n) => { settings.handicap = n; });
   addChoice('settings-choices', 'effects', VOLUMES, () => settings.sound, (n) => { settings.sound = n; },

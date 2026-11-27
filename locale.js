@@ -145,6 +145,10 @@ export const translations = {
 
     // Setup / pause
     setupTitle: 'NEW GAME',
+    opponent: 'MODE',
+    opponentSolo: '1 PLAYER',
+    opponentVs: 'VS COMPUTER',
+    opponentWith: 'WITH COMPUTER',
     start: 'START',
     level: 'LEVEL',
     rows: 'GARBAGE ROWS',
@@ -347,6 +351,10 @@ export const translations = {
 
     // Setup / pause
     setupTitle: 'НОВАЯ ИГРА',
+    opponent: 'РЕЖИМ',
+    opponentSolo: '1 ИГРОК',
+    opponentVs: 'ПРОТИВ КОМПЬЮТЕРА',
+    opponentWith: 'С КОМПЬЮТЕРОМ',
     start: 'СТАРТ',
     level: 'УРОВЕНЬ',
     rows: 'РЯДЫ НА СТАРТЕ',
