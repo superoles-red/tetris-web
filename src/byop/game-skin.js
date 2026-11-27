@@ -276,7 +276,10 @@ export async function applyGameSkin(options = {}) {
     well: buildWellFrameUrl(options.chr),
   };
   const family = `TengenTap-${language}-${Math.random().toString(36).slice(2, 8)}`;
-  const font = options.chr ? await installGameFont(options.chr, language, family) : null;
+  // Кириллица чуть шире английских глифов: даём ей 9 px на знак,
+  // чтобы буквы не слипались и читались так же легко.
+  const advance = language === 'ru' ? 1152 : 1024;
+  const font = options.chr ? await installGameFont(options.chr, language, family, { advance }) : null;
   assets.font = font;
   if (!root) return { applied: false, font, assets };
   if (font) root.style.setProperty(SKIN_VARS.font, `"${font}", "Courier New", monospace`);

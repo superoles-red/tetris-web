@@ -11,17 +11,21 @@
 const PIXEL = 128;
 const UNITS = 1024;
 
-/** Кириллица перевода PSCD: буква → индекс тайла в CHR (как в build-font.py старого порта). */
-export const RUSSIAN_TILES = {
-  'А': 0x41, 'Б': 0x42, 'В': 0x43, 'Г': 0x44, 'Д': 0x45, 'Е': 0x46,
-  'Ё': 0x48, 'Ж': 0x47, 'З': 0x33, 'И': 0x49, 'Й': 0x4a, 'К': 0x4b,
-  'Л': 0x4c, 'М': 0x4d, 'Н': 0x4e, 'О': 0x30, 'П': 0x50, 'Р': 0x51,
-  'С': 0x52, 'Т': 0x53, 'У': 0x54, 'Ф': 0x55, 'Х': 0x56, 'Ц': 0x82,
-  'Ч': 0x34, 'Ш': 0x57, 'Ъ': 0x4f, 'Ы': 0x83, 'Ь': 0x84, 'Э': 0x58,
-  'Ю': 0x59, 'Я': 0x5a,
-};
+import { BUILTIN_GLYPHS, BUILTIN_PUNCTUATION } from './pixel-font.js';
 
 const LATIN = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+/** Строки-картинки '#/.' → байты (MSB слева), как у CHR-тайла. */
+function rowsFromStrings(rows) {
+  const bytes = new Uint8Array(rows.length);
+  for (let y = 0; y < rows.length; y++) {
+    let bits = 0;
+    for (let x = 0; x < 8; x++) if (rows[y][x] === '#') bits |= 0x80 >> x;
+    bytes[y] = bits;
+  }
+  return bytes;
+}
+
 
 class Writer {
   constructor(capacity = 1024) { this.bytes = new Uint8Array(capacity); this.length = 0; }
@@ -53,49 +57,6 @@ function checksum(bytes) {
 }
 
 
-/** Знаки препинания и символы в стиле игрового шрифта (наш рисунок). */
-const PUNCTUATION = {
-  '?': ['........', '.#####..', '##...##.', '....###.', '...###..', '...##...', '........', '...##...'],
-  '!': ['........', '...##...', '...##...', '...##...', '...##...', '...##...', '........', '...##...'],
-  '.': ['........', '........', '........', '........', '........', '........', '........', '...##...'],
-  ',': ['........', '........', '........', '........', '........', '........', '...##...', '..##....'],
-  ':': ['........', '........', '...##...', '...##...', '........', '...##...', '...##...', '........'],
-  '-': ['........', '........', '........', '.#####..', '........', '........', '........', '........'],
-  '—': ['........', '........', '........', '########', '........', '........', '........', '........'],
-  '…': ['........', '........', '........', '........', '........', '........', '........', '##.##.##'],
-  '/': ['........', '.....##.', '....##..', '...##...', '..##....', '.##.....', '##......', '........'],
-  '(': ['........', '...###..', '..##....', '.##.....', '.##.....', '..##....', '...###..', '........'],
-  ')': ['........', '.###....', '...##...', '....##..', '....##..', '...##...', '.###....', '........'],
-  '«': ['........', '........', '..##.##.', '.##.##..', '##.##...', '.##.##..', '..##.##.', '........'],
-  '»': ['........', '........', '##.##...', '.##.##..', '..##.##.', '.##.##..', '##.##...', '........'],
-  '%': ['........', '##...##.', '##..##..', '...##...', '..##....', '.##..##.', '##...##.', '........'],
-  '\'': ['........', '...##...', '...##...', '........', '........', '........', '........', '........'],
-  '·': ['........', '........', '........', '...##...', '...##...', '........', '........', '........'],
-};
-
-function builtinGlyph(name) {
-  const rows = PUNCTUATION[name];
-  if (!rows) return null;
-  const out = new Uint8Array(8);
-  for (let y = 0; y < 8; y++) {
-    let bits = 0;
-    for (let x = 0; x < 8; x++) if (rows[y][x] === '#') bits |= 0x80 >> x;
-    out[y] = bits;
-  }
-  return out;
-}
-
-/**
- * Кириллица PSCD нарисована в 6 строк вместо 7 (как в EN). Растягиваем
- * на 7 строк и ставим на базовую линию, чтобы высота совпадала с английской.
- */
-const RU_ROW_MAP = [1, 2, 3, 4, 4, 5, 6];
-function normalizeRuGlyph(rows) {
-  const out = new Uint8Array(8);
-  for (let y = 0; y < 7; y++) out[y + 1] = rows[RU_ROW_MAP[y]] ?? 0;
-  return out;
-}
-
 /** 8 строк по 8 бит из plane 0 CHR-тайла. */
 export function glyphFromChr(chr, tileIndex) {
   const base = tileIndex * 16;
@@ -113,7 +74,7 @@ function buildGlyf(rowsList) {
     offsets.push(writer.length);
     if (!hasInk(rows)) continue;
     const pixels = [];
-    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (rows[y] & (0x80 >> x)) pixels.push([x, y]);
+    for (let y = 0; y < rows.length; y++) for (let x = 0; x < 8; x++) if (rows[y] & (0x80 >> x)) pixels.push([x, y]);
     const xMin = Math.min(...pixels.map(([x]) => x * PIXEL));
     const xMax = Math.max(...pixels.map(([x]) => (x + 1) * PIXEL));
     const yMin = Math.min(...pixels.map(([, y]) => (7 - y) * PIXEL));
@@ -158,21 +119,21 @@ function buildName(family) {
  * @param {Map<string, Uint8Array>} glyphs
  * @param {string} family
  */
-export function buildTtf(glyphs, family = 'TengenCart') {
+export function buildTtf(glyphs, family = 'TengenCart', { advance = UNITS } = {}) {
   const chars = [...glyphs.keys()].filter(ch => ch !== ' ' && ch !== '\u0000');
   chars.sort((a, b) => a.codePointAt(0) - b.codePointAt(0));
-  const entries = [['\u0000', new Uint8Array(8)], [' ', glyphs.get(' ') ?? new Uint8Array(8)], ...chars.map(ch => [ch, glyphs.get(ch)])];
+  const entries = [['\u0000', new Uint8Array(9)], [' ', glyphs.get(' ') ?? new Uint8Array(9)], ...chars.map(ch => [ch, glyphs.get(ch)])];
   const { glyf, offsets } = buildGlyf(entries.map(([, rows]) => rows));
   const numGlyphs = entries.length;
 
   const head = new Writer(54);
   head.u32(0x00010000); head.u32(0x00010000); head.u32(0); head.u32(0x5f0f3cf5);
   head.u16(0x000b); head.u16(UNITS); head.u32(0); head.u32(0); head.u32(0); head.u32(0);
-  head.i16(0); head.i16(0); head.i16(8 * PIXEL); head.i16(9 * PIXEL);
+  head.i16(-2 * PIXEL); head.i16(-PIXEL); head.i16(8 * PIXEL); head.i16(9 * PIXEL);
   head.u16(0); head.u16(8); head.i16(2); head.i16(0); head.i16(0);
 
   const hhea = new Writer(36);
-  hhea.u32(0x00010000); hhea.i16(UNITS); hhea.i16(0); hhea.i16(0);
+  hhea.u32(0x00010000); hhea.i16(UNITS); hhea.i16(-PIXEL); hhea.i16(0);
   hhea.u16(UNITS); hhea.i16(0); hhea.i16(0); hhea.i16(8 * PIXEL);
   hhea.i16(1); hhea.i16(0); hhea.i16(0);
   for (let i = 0; i < 4; i++) hhea.i16(0);
@@ -180,14 +141,14 @@ export function buildTtf(glyphs, family = 'TengenCart') {
 
   const maxp = new Writer(32);
   maxp.u32(0x00010000); maxp.u16(numGlyphs);
-  maxp.u16(4 * 64); maxp.u16(64); // maxPoints, maxContours
+  maxp.u16(4 * 128); maxp.u16(128); // maxPoints, maxContours
   maxp.u16(0); maxp.u16(0); // composite
   maxp.u16(2); // maxZones
   maxp.u16(0); maxp.u16(0); maxp.u16(0); maxp.u16(0); maxp.u16(0);
   maxp.u16(0); maxp.u16(0); maxp.u16(0);
 
   const hmtx = new Writer(numGlyphs * 4);
-  for (let i = 0; i < numGlyphs; i++) { hmtx.u16(UNITS); hmtx.i16(0); }
+  for (let i = 0; i < numGlyphs; i++) { hmtx.u16(advance); hmtx.i16(0); }
 
   const loca = new Writer(numGlyphs * 2 + 2);
   if (offsets[offsets.length - 1] / 2 > 0xffff) throw new Error('ttf too large');
@@ -239,7 +200,7 @@ export function buildTtf(glyphs, family = 'TengenCart') {
   os2.i16(0); // sTypoDescender
   os2.i16(0); // sTypoLineGap
   os2.u16(UNITS); // usWinAscent
-  os2.u16(0); // usWinDescent
+  os2.u16(PIXEL); // usWinDescent
   os2.u32(1); // ulCodePageRange1: Latin
   os2.u32(0);
 
@@ -284,28 +245,19 @@ export function buildTtf(glyphs, family = 'TengenCart') {
  */
 export function glyphsFromRom(chr, language = 'en') {
   const glyphs = new Map();
-  glyphs.set(' ', new Uint8Array(8));
-  const bank = chr.subarray(0, 8192);
+  glyphs.set(' ', new Uint8Array(9));
   if (language === 'ru') {
-    // Перевод PSCD: 6-строчные буквы поднимаем на базовую линию, чтобы
-    // они смотрелись как английский шрифт из той же игры.
-    for (const ch of '0123456789') {
-      glyphs.set(ch, normalizeRuGlyph(glyphFromChr(bank, ch.charCodeAt(0))));
-    }
-    for (const [ch, index] of Object.entries(RUSSIAN_TILES)) {
-      glyphs.set(ch, normalizeRuGlyph(glyphFromChr(bank, index)));
-    }
-    const sh = glyphs.get('Ш')?.slice() ?? new Uint8Array(8);
-    const tse = glyphs.get('Ц')?.slice() ?? new Uint8Array(8);
-    sh[7] = tse[7] ?? 0;
-    glyphs.set('Щ', sh);
+    // Русский интерфейс рисуем своим шрифтом по образцу английского:
+    // буквы и цифры из русского картриджа (PSCD) слишком другие.
+    for (const [ch, rows] of BUILTIN_GLYPHS) glyphs.set(ch, rowsFromStrings(rows));
   } else {
-    for (const ch of LATIN) glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
+    const bank = chr.subarray(0, 8192);
+    for (const ch of LATIN) {
+      const rows = glyphFromChr(bank, ch.charCodeAt(0));
+      glyphs.set(ch, rows);
+    }
   }
-  for (const ch of Object.keys(PUNCTUATION)) {
-    const glyph = builtinGlyph(ch);
-    if (glyph) glyphs.set(ch, glyph);
-  }
+  for (const [ch, rows] of BUILTIN_PUNCTUATION) glyphs.set(ch, rowsFromStrings(rows));
   return glyphs;
 }
 
@@ -316,11 +268,11 @@ export function glyphsFromRom(chr, language = 'en') {
  * @param {string} family
  * @returns {Promise<string|null>}
  */
-export async function installGameFont(chr, language, family) {
+export async function installGameFont(chr, language, family, { advance = UNITS } = {}) {
   if (typeof FontFace === 'undefined' || typeof document === 'undefined') return null;
   try {
     const glyphs = glyphsFromRom(chr, language);
-    const ttf = buildTtf(glyphs, family);
+    const ttf = buildTtf(glyphs, family, { advance });
     const face = new FontFace(family, ttf);
     await face.load();
     document.fonts.add(face);
