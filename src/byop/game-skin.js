@@ -9,6 +9,35 @@ import { NTSC_PALETTE_BGR } from '../nes/constants.js';
 import { installGameFont } from './game-font.js';
 
 const ARROW_TILE = 62; // стрелка меню игры (plane 0 CHR)
+
+/** Золотая клетчатая рамка титульного экрана (как в оригинале). */
+export function buildGoldFrameUrl(titleBuffer) {
+  if (!titleBuffer || titleBuffer.length < 256 * 240) return null;
+  const canvas = makeCanvas(48, 48);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 48, 48);
+  ctx.imageSmoothingEnabled = false;
+  const put = (sx, sy, dx, dy) => {
+    const img = ctx.createImageData(16, 16);
+    const px = new Uint32Array(img.data.buffer);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const v = titleBuffer[(sy + y) * 256 + sx + x];
+      px[y * 16 + x] = 0xff000000 | (v & 0xff) << 16 | (v & 0xff00) | ((v >>> 16) & 0xff);
+    }
+    ctx.putImageData(img, dx, dy);
+  };
+  put(0, 0, 0, 0);
+  put(240, 0, 32, 0);
+  put(0, 224, 0, 32);
+  put(240, 224, 32, 32);
+  put(112, 0, 16, 0);
+  put(112, 224, 16, 32);
+  put(0, 112, 0, 16);
+  put(240, 112, 32, 16);
+  return toDataUrl(canvas);
+}
 const TITLE_CROP = [32, 32, 192, 176];
 const BLOCK_CROP = [240, 0, 16, 16];
 const WELL_CROP = [8, 40, 96, 176];
@@ -271,7 +300,8 @@ export async function applyGameSkin(options = {}) {
     font: null,
     arrow: options.chr ? buildArrowUrl(options.chr) : null,
     block: buildBlockPatternUrl(options.titleBuffer),
-    frame: buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
+    frame: buildGoldFrameUrl(options.titleBuffer) ?? buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
+    wellFrame: buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
     title: buildTitleArtUrl(options.titleBuffer),
     well: buildWellFrameUrl(options.chr),
   };

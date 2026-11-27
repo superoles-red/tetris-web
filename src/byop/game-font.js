@@ -247,9 +247,20 @@ export function glyphsFromRom(chr, language = 'en') {
   const glyphs = new Map();
   glyphs.set(' ', new Uint8Array(9));
   if (language === 'ru') {
-    // Русский интерфейс рисуем своим шрифтом по образцу английского:
-    // буквы и цифры из русского картриджа (PSCD) слишком другие.
-    for (const [ch, rows] of BUILTIN_GLYPHS) glyphs.set(ch, rowsFromStrings(rows));
+    // Буквы — наш шрифт, собранный из английских глифов; цифры берём из ROM
+    // (они одинаковые во всех языках и раньше выглядели нормально).
+    const bank = chr.subarray(0, 8192);
+    for (const [ch, rows] of BUILTIN_GLYPHS) {
+      if (/[0-9]/.test(ch)) continue;
+      glyphs.set(ch, rowsFromStrings(rows));
+    }
+    const digitRows = [1, 2, 3, 4, 4, 5, 6];
+    for (const ch of '0123456789') {
+      const src = glyphFromChr(bank, ch.charCodeAt(0));
+      const rows = new Uint8Array(9);
+      for (let y = 0; y < 7; y++) rows[y + 1] = src[digitRows[y]] ?? 0;
+      glyphs.set(ch, rows);
+    }
   } else {
     const bank = chr.subarray(0, 8192);
     for (const ch of LATIN) {

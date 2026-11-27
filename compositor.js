@@ -480,15 +480,15 @@ export class Compositor {
     const colX = w - infoW + pad;
     const colW = infoW - 2 * pad;
     const centerX = colX + colW / 2;
-    let y = pad + (this.pauseSize || 46) + pad;
+    let y = pad;
     const fitScale = (heightLeft) => Math.min(1.35, colW / 46, Math.max(.8, heightLeft / 120));
 
-    // Колодец врага — в правом верхнем углу колонки.
+    // Колодец врага — в правом верхнем углу колонки, тонкая рамка.
     if (this.opponent) {
-      const unit = colW / WELL_W;
+      const unit = (colW * 0.78) / WELL_W;
       const mh = WELL_H * unit;
-      this.miniWell(colX, y, unit, Math.max(4, Math.round(8 * unit)));
-      y += mh + pad * 2;
+      this.miniWell(colX + (colW - WELL_W * unit) / 2, y, unit, Math.max(3, Math.round(3 * unit)));
+      y += mh + pad;
     }
     let scale = fitScale(fieldBottom - y - 4 * (18 + 8));
     const gap = Math.max(6, Math.round(8 * scale));
@@ -504,6 +504,13 @@ export class Compositor {
     metric('score');
     metric('lines');
     if (!this.shared) metric('level');
+    // Статистика выпавших фигур — под очками (в обычном режиме; для
+    // мультирежимов пока не рисуем, чтобы не показывать чужие панели).
+    if (!this.opponent && !this.shared) {
+      const statsTop = y + pad;
+      const statsHeight = fieldBottom - statsTop - pad;
+      if (statsHeight > 50) this.chart(centerX, statsTop, colW, statsHeight, Math.min(scale * 1.1, colW / 56));
+    }
   }
 
   landscapeGame(w, h) {
