@@ -11,6 +11,37 @@ import { installGameFont } from './game-font.js';
 const ARROW_TILE = 62; // стрелка меню игры (plane 0 CHR)
 
 /** Золотая клетчатая рамка титульного экрана (как в оригинале). */
+export function buildOrnamentFrameUrl(titleBuffer) {
+  // 9-slice рамка как на титульном экране: внешние тёплые клетки + синий узор.
+  if (!titleBuffer || titleBuffer.length < 256 * 240) return null;
+  const slice = 24;
+  const canvas = makeCanvas(slice * 2 + 16, slice * 2 + 16);
+  if (!canvas) return null;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  const put = (sx, sy, dx, dy) => {
+    const img = ctx.createImageData(slice, slice);
+    const px = new Uint32Array(img.data.buffer);
+    for (let y = 0; y < slice; y++) for (let x = 0; x < slice; x++) {
+      const v = titleBuffer[(sy + y) * 256 + sx + x];
+      px[y * slice + x] = 0xff000000 | v;
+    }
+    ctx.putImageData(img, dx, dy);
+  };
+  const size = canvas.width;
+  put(8, 0, 0, 0);
+  put(232, 0, size - slice, 0);
+  put(8, 216, 0, size - slice);
+  put(232, 216, size - slice, size - slice);
+  put(112, 0, slice, 0);
+  put(112, 216, slice, size - slice);
+  put(0, 112, 0, slice);
+  put(232, 112, size - slice, slice);
+  return toDataUrl(canvas);
+}
+
 export function buildGoldFrameUrl(titleBuffer) {
   // Золотые разноцветные клетки из рамки титульного экрана: одна клетка
   // повторяется по периметру панели (как block.png старого порта).
@@ -278,7 +309,7 @@ export async function applyGameSkin(options = {}) {
     font: null,
     arrow: options.chr ? buildArrowUrl(options.chr) : null,
     block: buildBlockPatternUrl(options.titleBuffer),
-    frame: buildGoldFrameUrl(options.titleBuffer) ?? buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
+    frame: buildOrnamentFrameUrl(options.titleBuffer) ?? buildGoldFrameUrl(options.titleBuffer) ?? buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
     wellFrame: buildBraidFrameUrl(options.titleBuffer) ?? (options.chr ? buildFrameUrl(options.chr) : null),
     title: buildTitleArtUrl(options.titleBuffer),
     well: buildWellFrameUrl(options.chr),

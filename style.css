@@ -79,13 +79,18 @@ img, canvas, .panel { image-rendering: pixelated; }
   z-index: 4; display: grid; place-items: center; align-items: safe center;
   padding: 8px; overflow: auto; touch-action: pan-y;
 }
-#overlay.in-game { background: rgba(0, 0, 0, .79); }
+#overlay.in-game { background: rgba(0, 0, 0, .55); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+#overlay[data-menu="pause"] #panel {
+  background: rgba(0, 0, 0, .46);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
 #overlay.starting { background: #000; }
 .panel {
   position: relative;
   background: #000;
-  border: 16px solid var(--gold);
-  border-image: var(--frame-image) 16 / 16px / 0 repeat;
+  border: 24px solid var(--gold);
+  border-image: var(--frame-image) 24 / 24px / 0 repeat;
   display: grid; place-items: center; gap: clamp(7px, 1.8dvh, 13px);
   width: min(100%, 386px);
   max-width: 100%;
@@ -320,3 +325,8 @@ h1 + .hint { margin-top: -2px; }
   width: auto; max-width: 46%; padding: 6px 9px;
   font-size: 11px; line-height: 1; white-space: nowrap;
 }
+
+/* выбор ROM из ZIP */
+#zip-picker { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 18px; background: rgba(0, 0, 0, .88); }
+.zip-picker-box { display: grid; gap: 8px; width: min(100%, 360px); max-height: 80vh; overflow: auto; }
+.zip-picker-title { margin: 0 0 6px; color: var(--sky); font: 700 12px/1.2 var(--game-font, ui-monospace); letter-spacing: .08em; text-transform: uppercase; }
