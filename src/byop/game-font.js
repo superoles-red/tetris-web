@@ -247,25 +247,18 @@ export function glyphsFromRom(chr, language = 'en') {
   const glyphs = new Map();
   glyphs.set(' ', new Uint8Array(9));
   if (language === 'ru') {
-    // Буквы — наш шрифт, собранный из английских глифов; цифры берём из ROM
-    // (они одинаковые во всех языках и раньше выглядели нормально).
-    const bank = chr.subarray(0, 8192);
-    for (const [ch, rows] of BUILTIN_GLYPHS) {
-      if (/[0-9]/.test(ch)) continue;
-      glyphs.set(ch, rowsFromStrings(rows));
-    }
-    const digitRows = [1, 2, 3, 4, 4, 5, 6];
-    for (const ch of '0123456789') {
-      const src = glyphFromChr(bank, ch.charCodeAt(0));
-      const rows = new Uint8Array(9);
-      for (let y = 0; y < 7; y++) rows[y + 1] = src[digitRows[y]] ?? 0;
-      glyphs.set(ch, rows);
-    }
+    // Буквы и цифры — наш шрифт (одинаковые во всех языках).
+    for (const [ch, rows] of BUILTIN_GLYPHS) glyphs.set(ch, rowsFromStrings(rows));
   } else {
     const bank = chr.subarray(0, 8192);
+    // Буквы — из английского картриджа; цифры — из встроенного шрифта,
+    // чтобы во всех языках были одинаковые.
     for (const ch of LATIN) {
-      const rows = glyphFromChr(bank, ch.charCodeAt(0));
-      glyphs.set(ch, rows);
+      if (/[0-9]/.test(ch)) continue;
+      glyphs.set(ch, glyphFromChr(bank, ch.charCodeAt(0)));
+    }
+    for (const [ch, rows] of BUILTIN_GLYPHS) {
+      if (/[0-9]/.test(ch)) glyphs.set(ch, rowsFromStrings(rows));
     }
   }
   for (const [ch, rows] of BUILTIN_PUNCTUATION) glyphs.set(ch, rowsFromStrings(rows));

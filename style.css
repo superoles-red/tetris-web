@@ -80,10 +80,11 @@ img, canvas, .panel { image-rendering: pixelated; }
   padding: 8px; overflow: auto; touch-action: pan-y;
 }
 #overlay.in-game { background: rgba(0, 0, 0, .79); }
+#overlay.starting { background: #000; }
 .panel {
   position: relative;
   background: #000;
-  border: 16px solid var(--sky);
+  border: 16px solid var(--gold);
   border-image: var(--frame-image) 16 / 16px / 0 repeat;
   display: grid; place-items: center; gap: clamp(7px, 1.8dvh, 13px);
   width: min(100%, 386px);

@@ -28,10 +28,7 @@
 
 /* Нажимаемая «плитка» — рамка в стиле игровых панелей. */
 .pad .moves .key::after, .pad > .down::after {
-  content: ''; position: absolute; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: var(--key-height); height: var(--key-height);
-  pointer-events: none;
+  content: ''; position: absolute; inset: 0; pointer-events: none;
   border: var(--cap-border); background: var(--cap-fill);
   box-shadow: inset 0 0 0 1px #0000b4, 0 2px 0 rgb(0 0 0 / 70%);
 }
@@ -115,9 +112,8 @@
     right: calc(var(--edge) + (var(--portrait-info-width) - 2 * var(--edge) - var(--key-height)) / 2);
   }
   .pad .utility {
-    top: auto;
-    bottom: calc(var(--key-height) + var(--edge) + var(--key-height) + 22px);
-    right: calc(var(--edge) + (var(--portrait-info-width) - 2 * var(--edge) - var(--pause-size)) / 2);
+    top: calc(var(--ui-safe-top, 0px) + 6px);
+    right: calc(var(--device-safe-right, 0px) + var(--edge));
   }
 }
 
