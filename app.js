@@ -687,7 +687,7 @@ async function refreshSkin({ force = false } = {}) {
       }
       skinApplied = true;
       if (!result.font) document.documentElement.style.removeProperty('--game-font');
-      renderer.setFrameImage?.(result.assets.frame);
+      renderer.setFrameImage?.(result.assets.wellFrame ?? result.assets.frame);
       applyArtVisibility();
     }
     renderCard();
