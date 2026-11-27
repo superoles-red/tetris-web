@@ -204,9 +204,12 @@ function applyLanguage(language, { persist = true } = {}) {
   if (persist) persistSettings();
   localize();
   renderAll();
-  if (engine && engineState === 'ready' && view === 'game') {
-    // Игровые подписи берутся из ROM, интерфейс двигается сразу.
-    renderer.resize();
+  if (engine && engineState === 'ready') {
+    if (mode === MODE_FULL) void refreshSkin({ force: true });
+    if (view === 'game') {
+      // Игровые подписи берутся из ROM, интерфейс двигается сразу.
+      renderer.resize();
+    }
   }
 }
 
@@ -661,15 +664,18 @@ function capturePlayFrame() {
   playFrame.set(buffer);
 }
 
-async function refreshSkin() {
+async function refreshSkin({ force = false } = {}) {
   if (!rom || mode !== MODE_FULL) return;
   const chr = romChrBytes();
   if (!chr) return;
   try {
-    if (!skinApplied) {
+    if (!skinApplied || force) {
       const result = await applyGameSkin({
         chr,
-        language: rom.profile?.language === 'ru' ? 'ru' : 'en',
+        // Язык интерфейса, а не только язык картриджа: шрифт пересобирается
+        // при переключении РУС/ENG.
+        language: settings.language,
+        romLanguage: rom.profile?.language === 'ru' ? 'ru' : 'en',
         titleBuffer: titleFrame
       });
       titleArtUrl = result.assets.title;
@@ -680,6 +686,7 @@ async function refreshSkin() {
         byId('art-placeholder').hidden = true;
       }
       skinApplied = true;
+      if (!result.font) document.documentElement.style.removeProperty('--game-font');
       renderer.setFrameImage?.(result.assets.frame);
       applyArtVisibility();
     }
