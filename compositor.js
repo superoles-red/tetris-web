@@ -72,7 +72,7 @@ export class Compositor {
     this.ctx = canvas.getContext('2d');
     this.source = document.createElement('canvas');
     this.source.width = SRC_WIDTH;
-    this.source.height = 272;
+    this.source.height = 312;
     this.sourceCtx = this.source.getContext('2d', { alpha: false });
     this.image = this.sourceCtx.createImageData(SRC_WIDTH, 272);
     this.pixels = new Uint32Array(this.image.data.buffer);
@@ -158,6 +158,28 @@ export class Compositor {
           }
         }
         copyPiece(ppu, pixels, 4, 160, 48, 160, 240, 80, 16);
+      }
+      if (this.shared) {
+        // Спрайты обоих игроков над общим колодцем: фигуры видны в момент
+        // появления, как в обычном режиме, а не «из-за рамки».
+        copyPiece(ppu, pixels, 0, 80, 40, 0, 272, 96, 40);
+        copyPiece(ppu, pixels, 4, 160, 40, 0, 272, 96, 40);
+        // Отдельная прозрачная полоса: фон под фигурами не закрашиваем.
+        if (!this.sharedSpawn) {
+          this.sharedSpawn = document.createElement('canvas');
+          this.sharedSpawn.width = 96;
+          this.sharedSpawn.height = 40;
+        }
+        const spawnCtx = this.sharedSpawn.getContext('2d');
+        const spawnImage = spawnCtx.createImageData(96, 40);
+        const spawnPixels = new Uint32Array(spawnImage.data.buffer);
+        for (let y = 0; y < 40; y++) {
+          for (let x = 0; x < 96; x++) {
+            const v = pixels[(272 + y) * SRC_WIDTH + x];
+            spawnPixels[y * 96 + x] = (v & 0xffffff) ? (0xff000000 | (v & 0xffffff)) : 0;
+          }
+        }
+        spawnCtx.putImageData(spawnImage, 0, 0);
       }
       this.preview = this.inkBounds(80, 240, 32, 24);
       this.graph = this.graphBox(buffer);
@@ -270,7 +292,12 @@ export class Compositor {
     if (innerW > 1 && innerH > 1) {
       // 20 рядов: 2 ряда спавна сверху + 18 рядов общего поля — фигуры
       // появляются внутри рамки, как в обычном режиме.
-      this.blit([80, 64, 96, 160], innerX, innerY, innerW, innerH);
+      this.blit([80, 80, 96, 144], innerX, innerY, innerW, innerH);
+      // Полоса спавна (игровые строки 40..80) — прозрачно, поверх фона.
+      if (this.sharedSpawn) {
+        this.ctx.imageSmoothingEnabled = false;
+        this.ctx.drawImage(this.sharedSpawn, innerX, innerY - 40 * k, innerW, 40 * k);
+      }
     }
   }
 
@@ -468,19 +495,21 @@ export class Compositor {
     const infoW = this.infoWidth || 120;
     const fieldW = w - infoW;
     const fieldBottom = h - this.controlsHeight;
-    // Правая колонка — вся информация. Колодец игрока — слева и крупнее.
+    // Верхняя линия: под кнопкой паузы. Колодец и информация начинаются
+    // с одной линии, пауза — выше.
+    const topLine = pad + (this.pauseSize || 46) + pad;
     if (this.shared) {
-      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - 2 * pad) / 176);
-      this.sharedWell((fieldW - 112 * k) / 2, pad + (fieldBottom - 2 * pad - 176 * k) / 2, k);
+      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 200);
+      this.sharedWell((fieldW - 112 * k) / 2, topLine + 40 * k, k);
     } else {
-      const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - 2 * pad) / WELL_H);
-      this.well((fieldW - WELL_W * k) / 2, pad + (fieldBottom - 2 * pad - WELL_H * k) / 2, k);
+      const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - topLine - pad) / WELL_H);
+      this.well((fieldW - WELL_W * k) / 2, topLine, k);
     }
 
     const colX = w - infoW + pad;
     const colW = infoW - 2 * pad;
     const centerX = colX + colW / 2;
-    let y = pad;
+    let y = topLine;
     const fitScale = (heightLeft) => Math.min(1.35, colW / 46, Math.max(.8, heightLeft / 120));
 
     // Колодец врага — в правом верхнем углу колонки, тонкая рамка.
@@ -547,12 +576,15 @@ export class Compositor {
     const leftHeight = Math.max(48, bottom - y);
     const rightHeight = Math.max(48, rightBottom - rightY);
     if (this.opponent) {
-      // Слева — информация, справа — маленький колодец компьютера.
+      // Слева — информация, справа — колодец компьютера (по возможности крупный).
       this.sideHUD(leftX, y, side, leftHeight, ['next', 'score', 'lines', 'level'], true);
-      const unit = Math.max(1, Math.floor(Math.min(rightW / WELL_W, rightHeight / WELL_H)));
+      const enemyAreaX = rightX;
+      const enemyAreaW = Math.max(40, w - rightX - 14);
+      const enemyAreaH = Math.max(120, h - 200);
+      const unit = Math.min(enemyAreaW / WELL_W, enemyAreaH / WELL_H);
       const mw = WELL_W * unit, mh = WELL_H * unit;
-      if (mw <= rightW && mh <= rightHeight) {
-        this.miniWell(rightX + (rightW - mw) / 2, rightY + (rightHeight - mh) / 2, unit, Math.max(4, round(3 * pad)));
+      if (mw > 24 && mh > 48) {
+        this.miniWell(enemyAreaX + (enemyAreaW - mw) / 2, Math.max(6, (h - mh) / 2), unit, Math.max(4, round(3 * pad)));
       }
     } else {
       this.sideHUD(leftX, y, side, leftHeight, ['score', 'lines', 'level'], true);

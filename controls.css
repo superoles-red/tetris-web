@@ -112,7 +112,7 @@
     right: calc(var(--edge) + (var(--portrait-info-width) - 2 * var(--edge) - var(--key-height)) / 2);
   }
   .pad .utility {
-    top: calc(var(--ui-safe-top, 0px) + 6px);
+    top: calc(var(--ui-safe-top, 0px) + 2px);
     right: calc(var(--device-safe-right, 0px) + var(--edge));
   }
 }

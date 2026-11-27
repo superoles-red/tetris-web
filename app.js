@@ -119,6 +119,9 @@ let skinApplied = false;
 let titleFrame = null;
 let playFrame = null;
 let titleArtUrl = null;
+let titleAnim = null;
+let titleAnimTimer = 0;
+let titleImageData = null;
 const owner = runId();
 const heldInputs = new Map();
 const refreshChoices = [];
@@ -133,6 +136,69 @@ const recordInput = byId('record-input');
 const recordsTable = byId('records-table');
 const renderer = new Compositor(byId('picture'), resultBar);
 const controls = bindControls({ pad: document.querySelector('.pad'), setInput, pause });
+
+// --- загрузочный сплэш -----------------------------------------------------
+const splash = byId('splash');
+function hideSplash() {
+  if (!splash || splash.classList.contains('done')) return;
+  splash.classList.add('done');
+}
+function updateSplash() {
+  byId('splash-title').textContent = 'TETRIS';
+  byId('splash-note').textContent = t.loading ?? 'LOADING…';
+}
+// Страховка: сплэш не должен залипнуть ни при какой ошибке.
+setTimeout(hideSplash, 8000);
+
+// --- живая анимация титульного экрана (рамка + салюты, как в оригинале) ---
+function startTitleAnimation() {
+  if (view !== 'home' || mode !== MODE_FULL || engineState !== 'ready' || !engine || !rom) return;
+  if (titleAnim) return;
+  const canvas = byId('art-canvas');
+  if (!canvas) return;
+  const image = byId('art-image');
+  canvas.hidden = false;
+  if (image) image.hidden = true;
+  canvas.width = 256;
+  canvas.height = 240;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.imageSmoothingEnabled = false;
+  if (!titleImageData) titleImageData = ctx.createImageData(256, 240);
+  const pixels = new Uint32Array(titleImageData.data.buffer);
+  const draw = () => {
+    const buffer = engine.nes.ppu.buffer;
+    for (let i = 0; i < 256 * 240; i++) {
+      const v = buffer[i] >>> 0;
+      pixels[i] = 0xff000000 | ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
+    }
+    ctx.putImageData(titleImageData, 0, 0);
+  };
+  const loop = (time) => {
+    if (view !== 'home') { titleAnim = null; return; }
+    if (time - (loop.last ?? 0) > 33) {
+      loop.last = time;
+      try { engine.nes.frame(); } catch { /* картридж спит */ }
+      draw();
+      // Возвращаем титульный экран, чтобы салют/анимация рамки повторялись.
+      if (menuBase && time - (loop.resetAt ?? 0) > 7000) {
+        loop.resetAt = time;
+        try { engine.restoreStart(menuBase); } catch { /* не критично */ }
+      }
+    }
+    titleAnim = requestAnimationFrame(loop);
+  };
+  draw();
+  titleAnim = requestAnimationFrame(loop);
+}
+
+function stopTitleAnimation() {
+  if (titleAnim) cancelAnimationFrame(titleAnim);
+  titleAnim = null;
+  const canvas = byId('art-canvas');
+  if (canvas) canvas.hidden = true;
+  const image = byId('art-image');
+  if (image && titleArtUrl) image.hidden = false;
+}
 
 // --- настройки -------------------------------------------------------------
 function loadSettings() {
@@ -391,8 +457,13 @@ function renderPause() {
 
 // --- меню ------------------------------------------------------------------
 function applyArtVisibility() {
-  const show = view === 'home' ? Boolean(titleArtUrl) : view === 'cover';
+  const animated = view === 'home' && mode === MODE_FULL && engineState === 'ready' && Boolean(rom);
+  const show = animated || (view === 'home' ? Boolean(titleArtUrl) : view === 'cover');
   byId('art').hidden = !show;
+  if (animated) {
+    byId('art-canvas').hidden = !titleAnim;
+    if (titleArtUrl) byId('art-image').hidden = true;
+  }
 }
 
 function menu(name, { focus = true } = {}) {
@@ -417,6 +488,9 @@ function menu(name, { focus = true } = {}) {
   if (name === 'records') renderRecords();
   if (name === 'pause') renderPause();
   syncMenuMusic();
+  if (name === 'home') startTitleAnimation();
+  else stopTitleAnimation();
+  updateFastForward();
   if (focus) {
     const target = byId(FOCUS_ORDER[name]);
     try { target.focus({ preventScroll: true }); } catch { /* не фокусируется */ }
@@ -560,6 +634,7 @@ async function loadEngine() {
     renderCard();
     renderHome();
     if (view === 'cover') menu('home');
+    else if (view === 'home') startTitleAnimation();
     syncMenuMusic();
   } catch (error) {
     engineFailed(error);
@@ -777,6 +852,7 @@ function onFrame(buffer, nes, present = true) {
     releaseAll();
     activeScene = scene;
     game.dataset.scene = scene;
+    updateFastForward();
     if (scene === 'play') schedulePadMetrics();
   }
   if (!observedEnd && (scene === 'gameover' || scene === 'scores')) {
@@ -787,6 +863,7 @@ function onFrame(buffer, nes, present = true) {
     home();
     return;
   }
+  if ((rawFrames++ % 20) === 0) updateFastForward();
   const canAdvance = scene === 'gameover' && gameOverReady(nes);
   if (gameOverNext.hidden === canAdvance) gameOverNext.hidden = !canAdvance;
   const showResults = scene === 'scores';
@@ -896,10 +973,57 @@ function enterRun(scene = 'play') {
   applyMix();
   engine?.setMuted(false);
   resume();
+  updateFastForward();
+}
+
+function playerToppedOut() {
+  // Эвристика: верхние два ряда колодца игрока в VS почти заполнены —
+  // значит игрок проиграл и компьютер доигрывает партию.
+  const ppu = engine?.nes?.ppu;
+  if (!ppu?.vramMem) return false;
+  let filled = 0;
+  for (let row = 6; row <= 7; row++) {
+    for (let col = 2; col <= 11; col++) {
+      if (ppu.vramMem[0x2000 + row * 32 + col] !== 0) filled++;
+    }
+  }
+  return filled >= 10;
+}
+
+function updateFastForward() {
+  const button = byId('fast-forward');
+  if (!button) return;
+  const show = view === 'game' && activeScene === 'play' && mode === MODE_FULL
+    && settings.opponent === 'vs' && playerToppedOut();
+  button.hidden = !show;
+  button.textContent = t.fastForward ?? 'SPEED UP';
+}
+byId('fast-forward')?.addEventListener('click', () => { void fastForwardComputer(); });
+
+async function fastForwardComputer() {
+  if (!engine || mode !== MODE_FULL || settings.opponent !== 'vs') return;
+  const button = byId('fast-forward');
+  button.disabled = true;
+  engine.setMuted(true);
+  const deadline = performance.now() + 45000;
+  try {
+    while (performance.now() < deadline) {
+      await new Promise(requestAnimationFrame);
+      for (let i = 0; i < 240; i++) {
+        engine.nes.frame();
+        const scene = readScene(engine.nes);
+        if (scene === 'gameover' || scene === 'scores') return;
+      }
+    }
+  } finally {
+    engine.setMuted(false);
+    button.disabled = false;
+  }
 }
 
 async function beginFull() {
   if (!engine || engineState !== 'ready' || !loaded || view === 'starting') return;
+  stopTitleAnimation();
   showNotice(t.starting);
   releaseAll();
   engine.setPaused(true);
@@ -952,7 +1076,7 @@ async function beginFull() {
           return;
         }
         engine.nes.frame();
-        if (++frames > 900) throw new Error('The cartridge did not start a solo game');
+        if (++frames > 2400) throw new Error('The cartridge did not start a solo game');
       } while (performance.now() < deadline);
     }
   } catch (error) {
@@ -960,6 +1084,9 @@ async function beginFull() {
     engine?.setMuted(false);
     engineFailed(error);
     menu('home');
+    // Не оставляем игрока с «мёртвой» кнопкой «Новая игра».
+    engineState = engine ? 'ready' : engineState;
+    renderHome();
   }
 }
 
@@ -1673,6 +1800,8 @@ async function boot() {
   }
 
   renderAll();
+  updateSplash();
+  hideSplash();
   if (!rom) {
     menu('cover');
   } else if (!installResolved()) {

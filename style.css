@@ -101,6 +101,8 @@ img, canvas, .panel { image-rendering: pixelated; }
 /* титульная картинка из ROM игрока */
 #art { display: grid; place-items: center; width: 100%; margin: 0; }
 #art[hidden] { display: none; }
+#art-canvas { display: block; width: min(100%, 336px, 40dvh); height: auto; image-rendering: pixelated; background: #000; }
+#art-canvas[hidden] { display: none; }
 #art-image { display: block; width: min(100%, 336px, 40dvh); height: auto; image-rendering: pixelated; }
 #art-placeholder { position: relative; display: block; width: min(100%, 268px); aspect-ratio: 192 / 120; }
 #art-placeholder .cover-cell {
@@ -242,7 +244,7 @@ h1 + .hint { margin-top: -2px; }
 #records-table th:first-child, #records-table td:first-child { width: 10%; color: var(--stone); }
 #record-input {
   width: 100%; min-height: 44px; padding: 8px 10px; border: 2px solid var(--sky);
-  background: #000; color: #fff; font: 18px/1.3 var(--game-font);
+  background: #000; color: #fff; font: 18px/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   -webkit-user-select: text; user-select: text; -webkit-touch-callout: default;
 }
 #record-input::placeholder { color: var(--sky); letter-spacing: .2em; opacity: .7; }
@@ -298,4 +300,23 @@ h1 + .hint { margin-top: -2px; }
   .action { min-height: 40px; }
   h1 { font-size: 16px; }
   .game-title { font-size: 18px; }
+}
+
+/* Загрузочный сплэш: прячем мельтешение экранов при старте */
+#splash {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; gap: 10px;
+  background: #000; color: var(--gold); text-align: center; transition: opacity .25s ease;
+}
+#splash b { font: 700 clamp(22px, 7vw, 40px)/1.1 var(--game-font, ui-monospace); letter-spacing: .12em; text-transform: uppercase; }
+#splash span { font: 700 12px/1 var(--game-font, ui-monospace); letter-spacing: .18em; color: var(--sky); text-transform: uppercase; }
+#splash.done { opacity: 0; pointer-events: none; visibility: hidden; }
+
+/* На главном экране показываем живую анимацию титульного экрана игры. */
+#overlay[data-menu="home"] #panel { border-color: transparent; border-image: none; background: transparent; }
+
+#fast-forward {
+  position: absolute; left: auto; right: calc(var(--device-safe-right, 0px) + 8px);
+  top: calc(var(--ui-safe-top, 0px) + 56px); z-index: 4;
+  width: auto; max-width: 46%; padding: 6px 9px;
+  font-size: 11px; line-height: 1; white-space: nowrap;
 }
