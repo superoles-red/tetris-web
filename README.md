@@ -80,3 +80,23 @@ node tools/compare.mjs --rom /path/to/game.nes  # dev: сравнение с JSN
   NES) — [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - `Tetris`, `Tengen`, `Nintendo`, `Elorg` и связанные знаки принадлежат их
   владельцам. Проект не связан с правообладателями и не распространяет игру.
+
+## Процесс разработки (spec-kit)
+
+Дефекты и фичи ведутся через [Spec Kit](https://github.com/github/spec-kit):
+`specs/<номер>/spec.md` (сценарии и критерии приёмки) → `plan.md` → `tasks.md`.
+Задача считается выполненной только когда её критерий проверен.
+
+Перед сдачей обязательно прогнать самопроверку (нужен установленный `playwright-core`
+и Chrome/Chromium; ROM не входит в репозиторий):
+
+```bash
+PLAYWRIGHT_MODULE=/path/to/node_modules/playwright-core/index.mjs \
+  ROM_PATH=/path/to/game.nes node tools/self-play.mjs
+PLAYWRIGHT_MODULE=/path/to/node_modules/playwright-core/index.mjs \
+  ROM_PATH=/path/to/game.nes node tools/ui-audit.mjs
+```
+
+`self-play-test.mjs` проходит партию до game over, вводит имя и проверяет таблицу
+рекордов. `ui-audit.mjs` снимает метрики/скриншоты по титульной рамке, салютам,
+орнаменту меню, рекордам и Continue. Результаты аудита — `/tmp/audit-report.json`.

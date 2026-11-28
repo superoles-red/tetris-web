@@ -89,8 +89,8 @@ img, canvas, .panel { image-rendering: pixelated; }
 .panel {
   position: relative;
   background: #000;
-  border: 32px solid var(--gold);
-  border-image: var(--frame-image) 32 / 32px / 0 repeat;
+  border: 30px solid var(--gold);
+  border-image: var(--frame-image) 30 / 30px / 0 repeat;
   display: grid; place-items: center; gap: clamp(7px, 1.8dvh, 13px);
   width: min(100%, 386px);
   max-width: 100%;

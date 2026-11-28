@@ -74,7 +74,7 @@ export class Compositor {
     this.source.width = SRC_WIDTH;
     this.source.height = 312;
     this.sourceCtx = this.source.getContext('2d', { alpha: false });
-    this.image = this.sourceCtx.createImageData(SRC_WIDTH, 272);
+    this.image = this.sourceCtx.createImageData(SRC_WIDTH, 312);
     this.pixels = new Uint32Array(this.image.data.buffer);
     this.frameImage = null;
     this.frameReady = false;
@@ -165,8 +165,8 @@ export class Compositor {
       if (this.shared) {
         // Спрайты обоих игроков над общим колодцем: фигуры видны в момент
         // появления, как в обычном режиме, а не «из-за рамки».
-        copyPiece(ppu, pixels, 0, 80, 40, 0, 272, 96, 40);
-        copyPiece(ppu, pixels, 4, 160, 40, 0, 272, 96, 40);
+        copyPiece(ppu, pixels, 0, 80, 48, 0, 272, 96, 32);
+        copyPiece(ppu, pixels, 4, 160, 48, 0, 272, 96, 32);
         // Отдельная прозрачная полоса: фон под фигурами не закрашиваем.
         if (!this.sharedSpawn) {
           this.sharedSpawn = document.createElement('canvas');
@@ -323,7 +323,7 @@ export class Compositor {
   sharedWell(left, top, k) {
     const border = 8 * k;
     const width = 96 * k + border * 2;
-    const height = 176 * k + border * 2;
+    const height = 192 * k + border * 2;
     const x = round(left), y = round(top);
     this.wellRect = [x, y, round(width), round(height)];
     this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
@@ -331,13 +331,11 @@ export class Compositor {
     const innerW = round(width) - Math.round(border) * 2;
     const innerH = round(height) - Math.round(border) * 2;
     if (innerW > 1 && innerH > 1) {
-      // 20 рядов: 2 ряда спавна сверху + 18 рядов общего поля — фигуры
-      // появляются внутри рамки, как в обычном режиме.
-      this.blit([80, 80, 96, 144], innerX, innerY, innerW, innerH);
-      // Полоса спавна (игровые строки 40..80) — прозрачно, поверх фона.
+      // Внутри рамки: 4 клетки спавна сверху + 18 клеток поля, единый масштаб.
+      this.blit([80, 80, 96, 144], innerX, innerY + 32 * k, innerW, 144 * k);
       if (this.sharedSpawn) {
         this.ctx.imageSmoothingEnabled = false;
-        this.ctx.drawImage(this.sharedSpawn, innerX, innerY - 40 * k, innerW, 40 * k);
+        this.ctx.drawImage(this.sharedSpawn, innerX, innerY, innerW, 32 * k);
       }
     }
   }
@@ -591,9 +589,9 @@ export class Compositor {
   landscapeGame(w, h) {
     const pad = Math.min(9, Math.max(3, h * .012));
     if (this.shared) {
-      const k = Math.min((h - 2 * pad) / 176, (w - 2 * (58 + pad)) / 112);
+      const k = Math.min((h - 2 * pad - 70) / 192, (w - 2 * (58 + pad)) / 112);
       const fieldW = 112 * k, left = (w - fieldW) / 2;
-      this.sharedWell(left, pad + (h - 2 * pad - 176 * k) / 2, k);
+      this.sharedWell(left, pad, k);
       const gap = Math.min(38, Math.max(10, left * .09));
       const side = Math.max(20, Math.min(180, left - gap - pad));
       const top = Math.min(38, Math.max(9, h * .05));

@@ -209,13 +209,16 @@ function startTitleAnimation() {
     if (!frame) return;
     if (!imageData) { imageData = ctx.createImageData(256, 240); pixels = new Uint32Array(imageData.data.buffer); }
     const palette = titleLoop.palette;
+    // Правая кромка титульной рамки полная (16 px), левая — 8 px + чёрное поле.
+    // Строим левую кромку как зеркало правой: обе стороны одинаковые,
+    // без дублирования и чёрной полосы.
     for (let y = 0; y < 240; y++) {
       const row = y * 256;
-      for (let x = 0; x < 256; x++) {
-        // Левая внешняя рамка на титуле уже правой (начинается с x=8).
-        // Дорисовываем нормальный квадрат слева, как справа.
-        const sx = x < 8 ? 8 + (x % 8) : x;
-        pixels[row + x] = 0xff000000 | palette[frame[row + sx]];
+      for (let x = 0; x < 16; x++) {
+        pixels[row + x] = 0xff000000 | palette[frame[row + (255 - x)]];
+      }
+      for (let x = 16; x < 256; x++) {
+        pixels[row + x] = 0xff000000 | palette[frame[row + x]];
       }
     }
     ctx.putImageData(imageData, 0, 0);
@@ -244,6 +247,7 @@ function loadSettings() {
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)); } catch { /* опционально */ }
   if (!saved || typeof saved !== 'object') return;
   if (saved.language === 'ru' || saved.language === 'en') settings.language = saved.language;
+  if (['solo', 'vs', 'with'].includes(saved.opponent)) settings.opponent = saved.opponent;
   if (SETUP_LEVELS.includes(saved.level)) settings.level = saved.level;
   if (SETUP_HANDICAPS.includes(saved.handicap)) settings.handicap = saved.handicap;
   if (saved.track === SHUFFLE || TRACKS.includes(saved.track)) settings.track = saved.track;
@@ -254,7 +258,8 @@ function loadSettings() {
 function persistSettings() {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      language: settings.language, level: settings.level, handicap: settings.handicap,
+      language: settings.language, opponent: settings.opponent,
+      level: settings.level, handicap: settings.handicap,
       track: settings.track, sound: settings.sound, musicVolume: settings.musicVolume
     }));
   } catch { /* приватный режим */ }
@@ -1191,6 +1196,7 @@ function saveCurrentRun(exiting = false) {
     owner,
     savedAt: Date.now(),
     level: readShownLevel(nes),
+    opponent: settings.opponent ?? 'solo',
     thumbnail: renderer.thumbnail()
   };
   const initial = activeRun.fresh ? runStart : undefined;
@@ -1231,6 +1237,12 @@ async function continueSavedRun() {
     engine.setPaused(true);
     engine.restoreProgress(slot.checkpoint);
     seedRanking(engine.nes, records);
+    // Восстанавливаем режим партии (VS/WITH): иначе после перезапуска
+    // приложения композитор рисует не тот кадр и картинка «растягивается».
+    const savedOpponent = slot.info?.opponent;
+    settings.opponent = ['solo', 'vs', 'with'].includes(savedOpponent)
+      ? savedOpponent : (settings.opponent ?? 'solo');
+    persistSettings();
     runStart = slot.initial;
     activeRun = { id: slot.info.id, owner, fresh: false };
     enterRun(readScene(engine.nes));
@@ -1639,7 +1651,7 @@ function addChoice(containerId, key, values, read, change, format = String) {
 
 function buildSettingsChoices() {
   addChoice('setup-choices', 'opponent', ['solo', 'vs', 'with'], () => settings.opponent,
-    (value) => { settings.opponent = value; },
+    (value) => { settings.opponent = value; persistSettings(); },
     (value) => value === 'vs' ? t.opponentVs : value === 'with' ? t.opponentWith : t.opponentSolo);
   addChoice('setup-choices', 'level', SETUP_LEVELS, () => settings.level, (n) => { settings.level = n; });
   addChoice('setup-choices', 'rows', SETUP_HANDICAPS, () => settings.handicap, (n) => { settings.handicap = n; });
