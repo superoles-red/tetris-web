@@ -14,6 +14,23 @@ function exitCheckpoint(sha256) {
   return null;
 }
 
+export function clearExitBackup(sha256) {
+  try { localStorage.removeItem(EXIT_KEY + sha256); } catch { /* нет доступа */ }
+}
+
+/** Выбирает чекпоинт для Continue: exit-бэкап только от той же партии. */
+export function pickRestoreState(slot, backup) {
+  if (!slot?.info) return null;
+  const validBackup = backup && backup.info?.id === slot.info.id ? backup : null;
+  return {
+    staleBackup: Boolean(backup && !validBackup),
+    info: validBackup?.info ?? slot.info,
+    checkpoint: validBackup?.checkpoint ?? slot.checkpoint,
+    initial: slot.initial ?? null,
+    consumedOwner: validBackup?.info?.owner ?? null
+  };
+}
+
 export function saveOnExit(sha256, info, checkpoint) {
   // Закрытие вкладки может оборвать асинхронную транзакцию IndexedDB.
   // Синхронная копия закрывает этот зазор; основной снапшот — в IDB.
@@ -123,14 +140,18 @@ class RunStore {
         const slot = request.result;
         if (slot?.info?.id !== id) return set(null);
         const backup = exitCheckpoint(this.sha256);
-        const info = { ...(backup?.info ?? slot.info), owner };
-        if (!slot.checkpoint) return set(null);
-        const state = backup?.checkpoint ?? slot.checkpoint;
-        if (backup) {
-          consumedOwner = backup.info.owner;
-          store.put({ ...slot, checkpoint: state }, this.key);
+        const picked = pickRestoreState(slot, backup);
+        if (!picked) return set(null);
+        // Старый exit-бэкап от ДРУГОЙ партии не должен подменять Continue:
+        // иначе вместо WITH-партии загружается прошлая одиночная игра.
+        if (picked.staleBackup) clearExitBackup(this.sha256);
+        if (!picked.checkpoint) return set(null);
+        const info = { ...picked.info, owner };
+        if (picked.consumedOwner !== null) {
+          consumedOwner = picked.consumedOwner;
+          store.put({ ...slot, checkpoint: picked.checkpoint }, this.key);
         }
-        set({ info, checkpoint: state, initial: slot.initial ?? null });
+        set({ info, checkpoint: picked.checkpoint, initial: picked.initial });
       };
     }).then((result) => {
       if (consumedOwner) clearExitCheckpoint(this.sha256, id, consumedOwner);

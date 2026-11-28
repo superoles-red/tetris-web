@@ -7,7 +7,7 @@ import { bindControls } from './controls.js';
 import { initInstall } from './install.js';
 import { translations, preferredLanguage, formatText } from './locale.js';
 import { bindPhoneInsets } from './viewport.js';
-import { openSavedRun, saveOnExit } from './saved-run.js';
+import { openSavedRun, saveOnExit, clearExitBackup } from './saved-run.js';
 import {
   loadRecords, addRecord, clearRecords, recordName, limitRecordName,
   seedRanking, editingRecord, readRankedResult, recordsKey
@@ -1122,6 +1122,9 @@ async function beginFull() {
           capturePlayFrame();
           void refreshSkin();
           activeRun = { id: runId(), owner, fresh: true };
+          // Чистим старый exit-бэкап от предыдущей партии, чтобы он не всплыл
+          // в Continue после перезапуска.
+          clearExitBackup(rom.sha);
           // «Сразу в меню»: сохраняем состояние меню только после первого
           // успешного автозапуска партии.
           if (menuBase && !menuCheckpointSaved && store) {

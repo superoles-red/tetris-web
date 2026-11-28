@@ -10,3 +10,6 @@
 - [x] T006 Continue restores WITH layout: mode saved in slot + settings; old slots inferred
       from RAM 0x4f0 — PASS (`/tmp/cont-with-ok.png`, `/tmp/d-continue-old.png`)
 - [x] T007 Regression: VS shows only player's NEXT; 131 unit tests; build — PASS
+- [x] T008 Stale exit-backup from another run must not override Continue; clear it; mode
+      stays WITH afterwards — PASS: unit tests `tests/saved-run.test.mjs` (135 total),
+      E2E stale-exit scenario (`/tmp/e-stale-continue.png`, `/tmp/e-new-with-after.png`)
