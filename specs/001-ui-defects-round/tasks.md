@@ -11,4 +11,4 @@ Legend: [ ] todo, [x] done and verified.
 - [x] T007 Labels: VS = only NEXT; WITH = NEXT + NEXT CPU — PASS: `/tmp/audit-vs.png`, `/tmp/audit-with-late.png`
 - [x] T008 Records: name visible (slot 92.6 px, font `TengenTap-ru` = game font), Latin in RU font, ROM digits equal for RU/EN (glyph check: true) — PASS
 - [x] T009 Continue: root cause = `opponent` was not persisted; saved run restored as solo → wrong crops/stretch. Fixed + PASS: `/tmp/audit-continue.png`, `/tmp/cont-with-ok.png`; canvas 390×844 = CSS 390×844
-- [ ] T010 Run unit tests, build site, deploy, report PASS/FAIL per criterion with screenshots
+- [x] T010 Unit tests 131/131, build ok, Pages deploy ok, report PASS/FAIL with screenshots
