@@ -13,3 +13,6 @@
 - [x] T008 Stale exit-backup from another run must not override Continue; clear it; mode
       stays WITH afterwards — PASS: unit tests `tests/saved-run.test.mjs` (135 total),
       E2E stale-exit scenario (`/tmp/e-stale-continue.png`, `/tmp/e-new-with-after.png`)
+- [x] T009 Corrupted slot (mode says WITH, checkpoint is solo): Continue renders actual
+      cartridge state and corrects stored mode — PASS: E2E (`/tmp/corrupt-continue.png`),
+      `opponentFromRam()` unit test, 136 tests total

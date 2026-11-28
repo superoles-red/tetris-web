@@ -30,3 +30,12 @@ test('Continue без exit-бэкапа берёт слот', () => {
 test('Нет слота — восстанавливать нечего', () => {
   assert.equal(pickRestoreState(null, null), null);
 });
+
+import { opponentFromRam } from '../src/byop/full-mode.js';
+
+test('Режим из RAM картриджа: 0/3/4', () => {
+  assert.equal(opponentFromRam(0), 'solo');
+  assert.equal(opponentFromRam(3), 'vs');
+  assert.equal(opponentFromRam(4), 'with');
+  assert.equal(opponentFromRam(undefined), 'solo');
+});
