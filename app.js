@@ -1240,8 +1240,11 @@ async function continueSavedRun() {
     // Восстанавливаем режим партии (VS/WITH): иначе после перезапуска
     // приложения композитор рисует не тот кадр и картинка «растягивается».
     const savedOpponent = slot.info?.opponent;
-    settings.opponent = ['solo', 'vs', 'with'].includes(savedOpponent)
-      ? savedOpponent : (settings.opponent ?? 'solo');
+    // Старые сохранения не знали режима. Восстанавливаем его из RAM картриджа:
+    // 0 — 1 игрок, 3 — VS, 4 — WITH (значение пункта меню сохраняется в 0x4f0).
+    const ramMode = engine.nes?.cpu?.mem?.[0x4f0];
+    const inferred = ramMode === 3 ? 'vs' : ramMode === 4 ? 'with' : 'solo';
+    settings.opponent = ['solo', 'vs', 'with'].includes(savedOpponent) ? savedOpponent : inferred;
     persistSettings();
     runStart = slot.initial;
     activeRun = { id: slot.info.id, owner, fresh: false };

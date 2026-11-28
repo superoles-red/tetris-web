@@ -166,7 +166,7 @@ export class Compositor {
         // Спрайты обоих игроков над общим колодцем: фигуры видны в момент
         // появления, как в обычном режиме, а не «из-за рамки».
         copyPiece(ppu, pixels, 0, 80, 48, 0, 272, 96, 32);
-        copyPiece(ppu, pixels, 4, 160, 48, 0, 272, 96, 32);
+        copyPiece(ppu, pixels, 4, 80, 48, 0, 272, 96, 32);
         // Отдельная прозрачная полоса: фон под фигурами не закрашиваем.
         if (!this.sharedSpawn) {
           this.sharedSpawn = document.createElement('canvas');
@@ -323,7 +323,8 @@ export class Compositor {
   sharedWell(left, top, k) {
     const border = 8 * k;
     const width = 96 * k + border * 2;
-    const height = 192 * k + border * 2;
+    // 32 px спавна + 144 px поля = 176 px; рамка по 8 px с каждой стороны.
+    const height = 176 * k + border * 2;
     const x = round(left), y = round(top);
     this.wellRect = [x, y, round(width), round(height)];
     this.frameRect(x, y, round(width), round(height), Math.max(6, round(border)));
