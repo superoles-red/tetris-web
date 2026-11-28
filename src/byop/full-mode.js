@@ -20,6 +20,12 @@ const SCENES = new Map([
 ]);
 
 /** Экраны меню, с которых можно снимать menu-checkpoint. */
+export function opponentFromRam(value) {
+  // В 0x4f0 картридж держит выбранный пункт меню режима: 0 — 1 игрок,
+  // 3 — VS COMPUTER, 4 — WITH COMPUTER. Это источник правды при Continue.
+  return value === 3 ? 'vs' : value === 4 ? 'with' : 'solo';
+}
+
 export const MENU_SCENES = new Set(['title', 'demo', 'mode', 'level', 'handicap', 'music']);
 
 /** Экраны, где идёт партия (для сохранений). */

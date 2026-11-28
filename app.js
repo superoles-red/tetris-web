@@ -19,7 +19,7 @@ import {
 } from './src/byop/passport.js';
 import {
   readScene, enteringInitials, gameOverReady, endGameWait, createSoloStart,
-  isMenuScene, isRunScene, SETUP_LEVELS, SETUP_HANDICAPS
+  isMenuScene, isRunScene, opponentFromRam, SETUP_LEVELS, SETUP_HANDICAPS
 } from './src/byop/full-mode.js';
 import { saveMenuCheckpoint, restoreMenuCheckpoint } from './src/byop/menu-checkpoint.js';
 import { frameToDataUrl, isUsableCoverFrame, coverDataUrlIsUsable } from './src/byop/cover.js';
@@ -1242,12 +1242,10 @@ async function continueSavedRun() {
     seedRanking(engine.nes, records);
     // Восстанавливаем режим партии (VS/WITH): иначе после перезапуска
     // приложения композитор рисует не тот кадр и картинка «растягивается».
-    const savedOpponent = slot.info?.opponent;
-    // Старые сохранения не знали режима. Восстанавливаем его из RAM картриджа:
-    // 0 — 1 игрок, 3 — VS, 4 — WITH (значение пункта меню сохраняется в 0x4f0).
-    const ramMode = engine.nes?.cpu?.mem?.[0x4f0];
-    const inferred = ramMode === 3 ? 'vs' : ramMode === 4 ? 'with' : 'solo';
-    settings.opponent = ['solo', 'vs', 'with'].includes(savedOpponent) ? savedOpponent : inferred;
+    // Режим восстанавливаем по фактическому состоянию картриджа (RAM 0x4f0:
+    // 0 — 1 игрок, 3 — VS, 4 — WITH), а не только по записи в слоте: старый баг
+    // мог перезаписать слот чужим чекпоинтом. Состояние картриджа — источник правды.
+    settings.opponent = opponentFromRam(engine.nes?.cpu?.mem?.[0x4f0]);
     persistSettings();
     runStart = slot.initial;
     activeRun = { id: slot.info.id, owner, fresh: false };
