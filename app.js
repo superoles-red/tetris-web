@@ -1025,6 +1025,7 @@ function enterRun(scene = 'play') {
   activeScene = scene;
   game.dataset.scene = scene;
   renderer.setGameMode?.(mode === MODE_FULL ? (settings.opponent ?? 'solo') : 'solo');
+  game.dataset.opponent = mode === MODE_FULL ? (settings.opponent ?? 'solo') : 'solo';
   applyMix();
   engine?.setMuted(false);
   resume();

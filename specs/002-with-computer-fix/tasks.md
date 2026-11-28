@@ -16,3 +16,6 @@
 - [x] T009 Corrupted slot (mode says WITH, checkpoint is solo): Continue renders actual
       cartridge state and corrects stored mode — PASS: E2E (`/tmp/corrupt-continue.png`),
       `opponentFromRam()` unit test, 136 tests total
+- [x] T010 Height parity: WITH rendered at the same scale/height as solo (in-game both
+      22 rows; screenshots 513 px vs 517 px), portrait HUD moved above the well —
+      PASS (`/tmp/solo-height.png`, `/tmp/with-height.png`, `/tmp/with-height-land.png`)
