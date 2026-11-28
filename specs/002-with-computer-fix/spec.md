@@ -44,7 +44,13 @@ Shared (WITH COMPUTER) well rendering had three independent defects:
    different game's checkpoint (while the slot still claims another mode), Continue must
    render the *actual* cartridge state (mode read from RAM 0x4f0), not a stretched layout
    from the stale mode. The stored mode is corrected.
-9. **No regressions**: VERSUS mode still shows only the player's NEXT; unit tests and the
+9. **Height parity with the solo well**: in the original ROM both wells have the same
+   height in game pixels (content rows 48..224); WITH is only wider (12 tiles vs 10).
+   Rendered WITH must use the same pixel scale `k` as solo, so its height matches.
+   In portrait the NEXT/NEXT CPU/score HUD is placed above the well (like the original
+   WITH screen) so the right info column does not squeeze the well; on short screens a
+   compact right column fallback is allowed. Landscape uses the same `k`.
+10. **No regressions**: VERSUS mode still shows only the player's NEXT; unit tests and the
    UI audit pass.
 
 ## Verification
@@ -57,6 +63,10 @@ Shared (WITH COMPUTER) well rendering had three independent defects:
     x=80..176 — both copied with origin 80.
 * Screenshots: `/tmp/d-with-spawn.png`, `/tmp/d-with-late.png`, `/tmp/d-with-land.png`,
   `/tmp/cont-with-ok.png`, `/tmp/d-continue-old.png`.
+* Height parity measurement on rendered screenshots: interior height of solo well 513 px,
+  WITH well 517 px (0.8% — rounding/borders); screenshots `/tmp/solo-height.png`,
+  `/tmp/with-height.png`, landscape `/tmp/with-height-land.png`. In-game measurement:
+  both wells have content rows 48..224 (22 rows), WITH interior 96 px vs solo 80 px wide.
 * Corrupted-slot E2E: slot info says `with`, checkpoint is solo → Continue renders solo
   correctly and stores `solo` (`/tmp/corrupt-continue.png`).
 * Stale exit-backup regression: `tests/saved-run.test.mjs` (6 tests) and E2E

@@ -533,15 +533,58 @@ export class Compositor {
 
   portrait(w, h) {
     const pad = Math.max(4, Math.round(w * .012));
-    const infoW = this.infoWidth || 120;
-    const fieldW = w - infoW;
+    let infoW = this.infoWidth || 120;
+    let fieldW = w - infoW;
     const fieldBottom = h - this.controlsHeight;
     // Верхняя линия: под кнопкой паузы. Колодец и информация начинаются
     // с одной линии, пауза — выше.
     const topLine = pad + (this.pauseSize || 46) + pad + 8;
     if (this.shared) {
-      const k = Math.min((fieldW - 2 * pad) / 112, (fieldBottom - topLine - pad) / 192);
-      this.sharedWell((fieldW - 112 * k) / 2, topLine, k);
+      // В оригинале общий колодец той же высоты, что одиночный (шире на 2 клетки).
+      // Размещаем NEXT/NEXT CPU и счёт НАД колодцем, чтобы сохранить масштаб (k)
+      // и высоту как в solo; на низких экранах — компактная правая колонка.
+      const available = fieldBottom - topLine - pad;
+      const soloK = Math.min((w - infoW - 2 * pad) / WELL_W, available / WELL_H);
+      const desiredHeight = 192 * soloK;
+      const hudHeight = (hs) => 12 + 8 * hs + 6 + 24 * hs * 1.4 + 10 + (8 * hs * .8 + 8 * hs * .8 * 1.4 + 6);
+      let hs = 1.6;
+      let hudH = hudHeight(hs);
+      if (hudH > available - desiredHeight) { hs = 1.2; hudH = hudHeight(hs); }
+      if (hudH > available - desiredHeight && available - desiredHeight < 70) {
+        // Низкий экран: компактная правая колонка, колодец чуть меньше solo.
+        const k = Math.min(soloK, (w - 2 * pad - 70) / 112);
+        const wellW = 112 * k;
+        this.sharedWell(pad, topLine, k);
+        infoW = Math.max(60, w - (pad + wellW + pad));
+      } else {
+        const wellY = topLine + hudH + pad;
+        // Оставляем справа место под кнопку «вниз».
+        const k = Math.min(soloK, (fieldBottom - wellY - pad) / 192, (w - 2 * pad - 52) / 112);
+        const half = (w - 2 * pad) / 2;
+        const nextY = topLine;
+        const labelH = 8 * hs;
+        const previewScale = hs * 1.4;
+        const previewH = 24 * previewScale;
+        const drawNext = (cx, preview, cpu) => {
+          const label = this.labels.next;
+          const small = Math.min(hs, (half - 6) / label[2]);
+          const unit = Math.max(1, (small * 8) / 7);
+          const cpuWidth = cpu ? 3 * 5 * unit + 2 * unit : 0;
+          const labelCx = cx - cpuWidth / 2;
+          this.fit(label, labelCx, nextY, small);
+          if (cpu) this.drawCpuLabel(labelCx, nextY, small, label[2] * small);
+          if (preview) this.fit(preview, cx, nextY + labelH + 6, previewScale, half - 6);
+        };
+        drawNext(pad + half / 2, this.preview, false);
+        drawNext(w - pad - half / 2, this.preview2, true);
+        const scoreY = nextY + labelH + 6 + previewH + 10;
+        const scoreScale = hs * .8;
+        this.metric('score', pad + half * .5, scoreY, half * .9, scoreScale);
+        this.metric('lines', pad + half * 1.5, scoreY, half * .9, scoreScale);
+        // Слева: справа снизу живёт кнопка «вниз», колодец не должен её задевать.
+        this.sharedWell(pad, wellY, k);
+        return;
+      }
     } else {
       const k = Math.min((fieldW - 2 * pad) / WELL_W, (fieldBottom - topLine - pad) / WELL_H);
       this.well((fieldW - WELL_W * k) / 2, topLine, k);
@@ -590,9 +633,10 @@ export class Compositor {
   landscapeGame(w, h) {
     const pad = Math.min(9, Math.max(3, h * .012));
     if (this.shared) {
-      const k = Math.min((h - 2 * pad - 70) / 192, (w - 2 * (58 + pad)) / 112);
+      const soloK = Math.min((h - 2 * pad) / WELL_H, (w - 2 * (58 + pad)) / WELL_W);
+      const k = Math.min(soloK, (w - 2 * (58 + pad)) / 112);
       const fieldW = 112 * k, left = (w - fieldW) / 2;
-      this.sharedWell(left, pad, k);
+      this.sharedWell(left, pad + Math.max(0, (h - 2 * pad - 192 * k) / 2), k);
       const gap = Math.min(38, Math.max(10, left * .09));
       const side = Math.max(20, Math.min(180, left - gap - pad));
       const top = Math.min(38, Math.max(9, h * .05));

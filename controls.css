@@ -111,6 +111,13 @@
     height: var(--key-height);
     right: calc(var(--edge) + (var(--portrait-info-width) - 2 * var(--edge) - var(--key-height)) / 2);
   }
+  /* В WITH COMPUTER правой колонки нет — кнопка «вниз» у края, чтобы не
+     перекрывать общий колодец. */
+  #game[data-opponent="with"] .pad > .down {
+    right: calc(var(--device-safe-right, 0px) + var(--edge));
+    width: 46px;
+    height: 46px;
+  }
   .pad { --pause-size: clamp(50px, 13.5vw, 62px); }
   .pad .utility {
     top: 14px;
